@@ -40,7 +40,7 @@ with st.expander("Adicionar Novo Produto"):
 with st.expander("Atualizar Estoque e Preço"):
     if not st.session_state.estoque.empty:
         produtos_disponiveis = st.session_state.estoque['Produto'].tolist()
-        produto_selecionado = st.selectbox("Selecione o produto:", produtos_disponiveis)
+        produto_selecionado = st.selectbox("Selecione o produto para atualizar:", produtos_disponiveis, key="select_update")
         
         indice_atual = st.session_state.estoque[st.session_state.estoque['Produto'] == produto_selecionado].index[0]
         quantidade_atual = st.session_state.estoque.at[indice_atual, 'Quantidade']
@@ -56,6 +56,18 @@ with st.expander("Atualizar Estoque e Preço"):
             st.rerun()
     else:
         st.info("Nenhum produto cadastrado para atualizar.")
+
+with st.expander("Remover Produto"):
+    if not st.session_state.estoque.empty:
+        produtos_disponiveis_remover = st.session_state.estoque['Produto'].tolist()
+        produto_remover = st.selectbox("Selecione o produto para remover:", produtos_disponiveis_remover, key="select_remove")
+        
+        if st.button("Excluir Produto"):
+            st.session_state.estoque = st.session_state.estoque[st.session_state.estoque['Produto'] != produto_remover]
+            st.success(f"Produto '{produto_remover}' removido com sucesso!")
+            st.rerun()
+    else:
+        st.info("Nenhum produto cadastrado para remover.")
 
 dados = st.session_state.estoque.copy()
 if not dados.empty:
