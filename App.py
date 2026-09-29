@@ -11,9 +11,6 @@ st.markdown("""
         background-color: #f5f7fb;
         padding: 20px;
     }
-    .css-1544g2x {
-        background-color: #ffffff;
-    }
     
     /* Cabeçalho */
     .title-text {
@@ -144,7 +141,6 @@ if not dados.empty:
         total_estoque = dados['Valor Total'].sum()
         total_itens = dados['Quantidade'].sum()
         
-        # Exibição das métricas lado a lado com estilo
         m1, m2 = st.columns(2)
         m1.metric("Valor Total em Estoque", f"R$ {total_estoque:.2f}")
         m2.metric("Quantidade Total de Itens", total_itens)
