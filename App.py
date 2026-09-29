@@ -37,19 +37,22 @@ with st.expander("Adicionar Novo Produto"):
             st.success("Produto cadastrado com sucesso!")
             st.rerun()
 
-with st.expander("Atualizar Quantidade de Produto"):
+with st.expander("Atualizar Estoque e Preço"):
     if not st.session_state.estoque.empty:
         produtos_disponiveis = st.session_state.estoque['Produto'].tolist()
         produto_selecionado = st.selectbox("Selecione o produto:", produtos_disponiveis)
         
         indice_atual = st.session_state.estoque[st.session_state.estoque['Produto'] == produto_selecionado].index[0]
         quantidade_atual = st.session_state.estoque.at[indice_atual, 'Quantidade']
+        preco_atual = st.session_state.estoque.at[indice_atual, 'Valor Unitário']
         
         nova_quantidade = st.number_input("Nova Quantidade em Estoque", value=int(quantidade_atual), min_value=0, step=1)
+        novo_preco = st.number_input("Novo Valor Unitário (R$)", value=float(preco_atual), min_value=0.0, step=0.01)
         
-        if st.button("Atualizar Estoque"):
+        if st.button("Atualizar Dados"):
             st.session_state.estoque.at[indice_atual, 'Quantidade'] = nova_quantidade
-            st.success("Quantidade atualizada com sucesso!")
+            st.session_state.estoque.at[indice_atual, 'Valor Unitário'] = novo_preco
+            st.success("Dados atualizados com sucesso!")
             st.rerun()
     else:
         st.info("Nenhum produto cadastrado para atualizar.")
