@@ -32,7 +32,9 @@ if 'fornecedores' not in st.session_state:
 # Criação das 4 Abas principais
 tab_estoque, tab_vendas, tab_financeiro, tab_fornecedores = st.tabs(["📦 Estoque", "🛒 Vendas", "💰 Financeiro", "🤝 Fornecedores"])
 
+# ==========================================
 # ABA 1: ESTOQUE
+# ==========================================
 with tab_estoque:
     st.subheader("📦 Gestão de Estoque")
     
@@ -51,11 +53,10 @@ with tab_estoque:
             
             if btn_adicionar and nome:
                 # VERIFICAÇÃO PARA IMPEDIR PRODUTOS DUPLICADOS
-                # Converte tudo para minúsculo para evitar que "Feijão" e "feijão" sejam aceitos juntos
                 produto_existe = st.session_state.estoque['Produto'].str.lower().eq(nome.lower()).any()
                 
                 if produto_existe:
-                    st.error(f"⚠️️ Erro: O produto '{nome}' já está cadastrado no estoque!")
+                    st.error(f"⚠ Erro: O produto '{nome}' já está cadastrado no estoque!")
                 else:
                     novo_item = pd.DataFrame({
                         'Produto': [nome.strip()],
@@ -93,7 +94,7 @@ with tab_estoque:
             produtos_disponiveis_remover = st.session_state.estoque['Produto'].tolist()
             produto_remover = st.selectbox("Selecione o produto para remover:", produtos_disponiveis_remover, key="select_remove")
             if st.button("Excluir Produto"):
-                st.session_state.estoque = st.session_state.estoque[st.session_state.estoque['Produto'] != produto_remover]
+                st.session_state.estoque = st.session_state.estoque[st.session_state.estoque['Produto'] != produto_remover].reset_index(drop=True)
                 st.success(f"Produto '{produto_remover}' removido com sucesso!")
                 st.rerun()
         else:
@@ -107,7 +108,9 @@ with tab_estoque:
     else:
         st.info("Seu estoque está vazio no momento.")
 
+# ==========================================
 # ABA 2: VENDAS
+# ==========================================
 with tab_vendas:
     st.subheader("🛒 Registro de Vendas")
     with st.form("form_venda"):
@@ -158,12 +161,15 @@ with tab_vendas:
     else:
         st.info("Nenhuma venda registrada ainda.")
 
+# ==========================================
 # ABA 3: FINANCEIRO
+# ==========================================
 with tab_financeiro:
     st.subheader("💰 Controle Financeiro")
+    
     with st.expander("Registrar Transação Manual (Despesas etc.)"):
         with st.form("form_fin"):
-            desc = st.text_input("Descrição (Ex: Conta de Luz, Material)")
+            desc = st.text_input("Descrição (Ex: Conta de Luz, Material, Fornecedor)")
             tipo = st.selectbox("Tipo", ["Entrada", "Saída"])
             valor = st.number_input("Valor (R$)", min_value=0.01, step=0.01)
             btn_fin = st.form_submit_button("Registrar Transação")
@@ -178,6 +184,28 @@ with tab_financeiro:
                 st.session_state.financeiro = pd.concat([st.session_state.financeiro, transacao], ignore_index=True)
                 st.success("Transação registrada!")
                 st.rerun()
+                
+    # NOVA FUNÇÃO: Remover transação errada
+    with st.expander("🗑️ Remover Transação (Corrigir Erro)"):
+        if not st.session_state.financeiro.empty:
+            df_fin = st.session_state.financeiro.copy()
+            opcoes_exclusao = []
+            
+            # Cria uma lista formatada para o usuário escolher o que apagar
+            for i, row in df_fin.iterrows():
+                texto = f"ID: {i} | {row['Data']} | {row['Tipo']} | {row['Descrição']} | R$ {row['Valor']:.2f}"
+                opcoes_exclusao.append(texto)
+                
+            transacao_excluir = st.selectbox("Selecione a transação que deseja apagar:", opcoes_exclusao)
+            
+            if st.button("Apagar Registro Selecionado"):
+                # Extrai o ID numérico da string para apagar a linha correta
+                idx_excluir = int(transacao_excluir.split("|")[0].replace("ID:", "").strip())
+                st.session_state.financeiro = st.session_state.financeiro.drop(idx_excluir).reset_index(drop=True)
+                st.success("Transação apagada com sucesso!")
+                st.rerun()
+        else:
+            st.info("Não há transações financeiras para remover.")
 
     dados_fin = st.session_state.financeiro.copy()
     if not dados_fin.empty:
@@ -195,7 +223,9 @@ with tab_financeiro:
     else:
         st.info("Nenhuma movimentação financeira registrada.")
 
+# ==========================================
 # ABA 4: FORNECEDORES
+# ==========================================
 with tab_fornecedores:
     st.subheader("🤝 Cadastro de Fornecedores")
     with st.expander("Adicionar Fornecedor"):
