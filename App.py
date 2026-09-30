@@ -1,19 +1,35 @@
 import streamlit as st
-from supabase import create_client, Client
 import pandas as pd
 import sqlite3
 import requests
 from datetime import datetime
+from supabase import create_client, Client
 
 # ==========================================
-# CONFIGURAÇÕES INICIAIS
+# CONFIGURAÇÕES INICIAIS E TEMA
 # ==========================================
-st.set_page_config(page_title="Sistema Integrado - Gestão & Acesso", page_icon="🛡️", layout="wide")
+st.set_page_config(layout="wide", page_title="Sistema ERP & Controle de Acesso Integrado", page_icon="🛡️")
 
+st.markdown("""
+<style>
+    /* Estilização Geral */
+    .main { background-color: #f5f7fb; padding: 20px; }
+    .title-text { color: #1f2937; font-weight: 700; font-size: 2.2rem; margin-bottom: 20px; text-align: center; }
+    .stExpander, .stTabs { border: 1px solid #e0e4e8; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); background-color: #ffffff; margin-bottom: 15px; padding: 10px; }
+    .stButton>button { background-color: #4f46e5; color: white; border-radius: 6px; font-weight: 600; border: none; padding: 10px 20px; transition: background-color 0.2s; }
+    .stButton>button:hover { background-color: #4338ca; }
+    .dataframe { border-radius: 8px; overflow: hidden; }
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown('<p class="title-text">🛡️ Sistema Integrado: ERP & Controle de Acesso</p>', unsafe_allow_html=True)
+
+# ==========================================
+# CONEXÃO E BANCO DE DADOS LOCAL (OFFLINE SYNC)
+# ==========================================
 def init_local_db():
     conn = sqlite3.connect("offline_data.db")
     cursor = conn.cursor()
-    # Fila de acessos pendentes de sincronização
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS registros_pendentes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,7 +39,6 @@ def init_local_db():
             data_hora TEXT
         )
     ''')
-    # Cache de usuários para uso offline
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS usuarios_cache (
             id TEXT PRIMARY KEY,
@@ -55,18 +70,22 @@ def check_conexao():
     except requests.ConnectionError:
         return False
 
+is_online = check_conexao()
+if is_online:
+    st.sidebar.success("🟢 Sistema Online (Supabase)")
+else:
+    st.sidebar.warning("🔴 Sistema Offline (Cache Local)")
+
 # ==========================================
-# FUNÇÕES DE BANCO DE DADOS (CONTROLE DE ACESSO & GESTÃO)
+# FUNÇÕES DE APOIO (SUPABASE / LOCAL)
 # ==========================================
 def buscar_usuarios_com_cache():
     conn = sqlite3.connect("offline_data.db")
     cursor = conn.cursor()
-    
     if check_conexao():
         try:
             resposta = supabase.table("usuarios").select("id, nome, email").execute()
             usuarios = resposta.data
-            
             cursor.execute("DELETE FROM usuarios_cache")
             for u in usuarios:
                 cursor.execute(
@@ -78,7 +97,6 @@ def buscar_usuarios_com_cache():
             return usuarios
         except Exception:
             pass 
-            
     cursor.execute("SELECT id, nome, email FROM usuarios_cache")
     linhas = cursor.fetchall()
     conn.close()
@@ -86,7 +104,6 @@ def buscar_usuarios_com_cache():
 
 def registrar_acesso(usuario_id, tipo_acesso, observacoes):
     data_hora_atual = datetime.utcnow().isoformat()
-    
     if check_conexao():
         try:
             dados = {
@@ -100,7 +117,6 @@ def registrar_acesso(usuario_id, tipo_acesso, observacoes):
             return True, "online"
         except Exception:
             pass 
-            
     conn = sqlite3.connect("offline_data.db")
     cursor = conn.cursor()
     cursor.execute(
@@ -114,16 +130,13 @@ def registrar_acesso(usuario_id, tipo_acesso, observacoes):
 def sincronizar_dados():
     if not check_conexao():
         return 0, "Sem conexão de rede para sincronizar no momento."
-        
     conn = sqlite3.connect("offline_data.db")
     cursor = conn.cursor()
     cursor.execute("SELECT id, usuario_id, tipo_acesso, observacoes, data_hora FROM registros_pendentes")
     pendentes = cursor.fetchall()
-    
     if not pendentes:
         conn.close()
         return 0, "Nenhum dado pendente na fila."
-    
     sucessos = 0
     for row in pendentes:
         id_local, uid, tipo, obs, data_hora_local = row
@@ -136,85 +149,342 @@ def sincronizar_dados():
                 "status_sincronizacao": "sincronizado_com_atraso"
             }
             supabase.table("registros_acesso").insert(dados).execute()
-            
             cursor.execute("DELETE FROM registros_pendentes WHERE id = ?", (id_local,))
             conn.commit()
             sucessos += 1
         except Exception:
             continue
-            
     conn.close()
     return sucessos, f"{sucessos} registros sincronizados com o Supabase."
 
-def cadastrar_usuario(nome, email, biometria_hash, consentimento_lgpd):
-    if not check_conexao():
-        raise Exception("O cadastro de novos usuários exige conexão com a internet.")
-        
-    dados = {
-        "nome": nome,
-        "email": email,
-        "biometria_hash": biometria_hash,
-        "consentimento_lgpd": consentimento_lgpd
-    }
-    return supabase.table("usuarios").insert(dados).execute()
-
-# --- Funções de Gestão de Produtos/Vendas (Supabase) ---
-def cadastrar_produto(nome_prod, categoria, preco, estoque):
-    if not check_conexao():
-        raise Exception("A gestão de produtos/vendas requer conexão online com o Supabase.")
-    dados = {
-        "nome": nome_prod,
-        "categoria": categoria,
-        "preco": float(preco),
-        "estoque": int(estoque)
-    }
-    return supabase.table("produtos").insert(dados).execute()
-
-def buscar_produtos():
-    try:
-        resposta = supabase.table("produtos").select("*").execute()
-        return resposta.data
-    except Exception:
-        return []
-
-def registrar_venda(produto_id, quantidade, valor_total):
-    if not check_conexao():
-        raise Exception("O registro de vendas requer conexão online.")
-    dados = {
-        "produto_id": produto_id,
-        "quantidade": int(quantidade),
-        "valor_total": float(valor_total),
-        "data_venda": datetime.utcnow().isoformat()
-    }
-    return supabase.table("vendas").insert(dados).execute()
-
-def buscar_vendas():
-    try:
-        resposta = supabase.table("vendas").select("*, produtos(nome)").order("data_venda", desc=True).execute()
-        return resposta.data
-    except Exception:
-        return []
+# ==========================================
+# INICIALIZAÇÃO DE SESSION STATE (ERP)
+# ==========================================
+if 'estoque' not in st.session_state:
+    st.session_state.estoque = pd.DataFrame(columns=['Produto', 'Categoria', 'Quantidade', 'Limite Mínimo', 'Valor Unitário'])
+if 'vendas' not in st.session_state:
+    st.session_state.vendas = pd.DataFrame(columns=['Data', 'Produto', 'Quantidade', 'Valor Total'])
+if 'financeiro' not in st.session_state:
+    st.session_state.financeiro = pd.DataFrame(columns=['Data', 'Descrição', 'Tipo', 'Valor'])
+if 'fornecedores' not in st.session_state:
+    st.session_state.fornecedores = pd.DataFrame(columns=['Nome', 'Contato', 'Categoria de Produto'])
 
 # ==========================================
-# INTERFACE DO USUÁRIO (UI)
+# ABAS PRINCIPAIS DO SISTEMA INTEGRADO
 # ==========================================
-st.title("🛡️ Sistema Integrado: Gestão, Vendas & Acesso")
-
-is_online = check_conexao()
-if is_online:
-    st.success("🟢 Sistema Online - Conectado ao servidor.")
-else:
-    st.warning("🔴 Sistema Offline - Operando no banco de dados local para acessos.")
-
-# Organização por Abas Principais
-tab_acesso_menu, tab_gestao_menu, tab_vendas_menu = st.tabs([
-    "🔑 Controle de Acesso & Usuários", 
-    "📦 Gestão de Produtos", 
-    "💰 Registro & Histórico de Vendas"
+tab_estoque, tab_vendas, tab_financeiro, tab_fornecedores, tab_acesso = st.tabs([
+    "📦 Estoque", 
+    "🛒 Vendas", 
+    "💰 Financeiro", 
+    "🤝 Fornecedores", 
+    "🔑 Controle de Acesso"
 ])
 
-# --- ABA 1: CONTROLE DE ACESSO & USUÁRIOS ---
-with tab_acesso_menu:
+# ==========================================
+# ABA 1: ESTOQUE
+# ==========================================
+with tab_estoque:
+    st.subheader("📦 Gestão de Estoque")
+    
+    with st.expander("Adicionar Novo Produto"):
+        with st.form("form_produto"):
+            col1, col2 = st.columns(2)
+            with col1:
+                nome = st.text_input("Nome do Produto")
+                categoria = st.selectbox("Categoria", ["Grãos", "Massas", "Óleos e Condimentos", "Bebidas", "Outros"])
+                preco = st.number_input("Valor Unitário (R$)", min_value=0.0, step=0.01)
+            with col2:
+                qtd = st.number_input("Quantidade Inicial", min_value=0, step=1)
+                limite = st.number_input("Limite Mínimo de Alerta", min_value=0, step=1)
+            
+            btn_adicionar = st.form_submit_button("Cadastrar Produto")
+            
+            if btn_adicionar and nome:
+                produto_existe = st.session_state.estoque['Produto'].str.lower().eq(nome.lower()).any()
+                if produto_existe:
+                    st.error(f"⚠ Erro: O produto '{nome}' já está cadastrado no estoque!")
+                else:
+                    novo_item = pd.DataFrame({
+                        'Produto': [nome.strip()],
+                        'Categoria': [categoria],
+                        'Quantidade': [qtd],
+                        'Limite Mínimo': [limite],
+                        'Valor Unitário': [preco]
+                    })
+                    st.session_state.estoque = pd.concat([st.session_state.estoque, novo_item], ignore_index=True)
+                    st.success("✅ Produto cadastrado com sucesso!")
+                    st.rerun()
+
+    with st.expander("Atualizar Estoque e Preço"):
+        if not st.session_state.estoque.empty:
+            produtos_disponiveis = st.session_state.estoque['Produto'].tolist()
+            produto_selecionado = st.selectbox("Selecione o produto para atualizar:", produtos_disponiveis, key="select_update")
+            
+            indice_atual = st.session_state.estoque[st.session_state.estoque['Produto'] == produto_selecionado].index[0]
+            quantidade_atual = st.session_state.estoque.at[indice_atual, 'Quantidade']
+            preco_atual = st.session_state.estoque.at[indice_atual, 'Valor Unitário']
+            
+            nova_quantidade = st.number_input("Nova Quantidade em Estoque", value=int(quantidade_atual), min_value=0, step=1)
+            novo_preco = st.number_input("Novo Valor Unitário (R$)", value=float(preco_atual), min_value=0.0, step=0.01)
+            
+            if st.button("Atualizar Dados"):
+                st.session_state.estoque.at[indice_atual, 'Quantidade'] = nova_quantidade
+                st.session_state.estoque.at[indice_atual, 'Valor Unitário'] = novo_preco
+                st.success("Dados atualizados com sucesso!")
+                st.rerun()
+        else:
+            st.info("Nenhum produto cadastrado para atualizar.")
+
+    with st.expander("Remover Produto"):
+        if not st.session_state.estoque.empty:
+            produtos_disponiveis_remover = st.session_state.estoque['Produto'].tolist()
+            produto_remover = st.selectbox("Selecione o produto para remover:", produtos_disponiveis_remover, key="select_remove")
+            if st.button("Excluir Produto"):
+                st.session_state.estoque = st.session_state.estoque[st.session_state.estoque['Produto'] != produto_remover].reset_index(drop=True)
+                st.success(f"Produto '{produto_remover}' removido com sucesso!")
+                st.rerun()
+        else:
+            st.info("Nenhum produto cadastrado para remover.")
+
+    dados_est = st.session_state.estoque.copy()
+    if not dados_est.empty:
+        produtos_em_alerta = dados_est[dados_est['Quantidade'] <= dados_est['Limite Mínimo']]
+        if not produtos_em_alerta.empty:
+            st.warning("⚠️ **Atenção: Os seguintes produtos estão com estoque baixo!**")
+            for _, row in produtos_em_alerta.iterrows():
+                st.error(f"📉 **{row['Produto']}**: Restam apenas {row['Quantidade']} unidades (Limite: {row['Limite Mínimo']})")
+        
+        dados_est['Valor Total'] = dados_est['Quantidade'] * dados_est['Valor Unitário']
+        st.subheader("Estoque Atual")
+        st.dataframe(dados_est.style.format({'Valor Unitário': 'R$ {:.2f}', 'Valor Total': 'R$ {:.2f}'}), hide_index=True)
+    else:
+        st.info("Seu estoque está vazio no momento.")
+
+# ==========================================
+# ABA 2: VENDAS
+# ==========================================
+with tab_vendas:
+    st.subheader("🛒 Registro de Vendas")
+    
+    with st.form("form_venda"):
+        if not st.session_state.estoque.empty:
+            prod_venda = st.selectbox("Produto Vendido", st.session_state.estoque['Produto'].tolist())
+            qtd_venda = st.number_input("Quantidade Vendida", min_value=1, step=1)
+            btn_venda = st.form_submit_button("Registrar Venda")
+            
+            if btn_venda:
+                idx = st.session_state.estoque[st.session_state.estoque['Produto'] == prod_venda].index[0]
+                estoque_atual = st.session_state.estoque.at[idx, 'Quantidade']
+                
+                if qtd_venda <= estoque_atual:
+                    st.session_state.estoque.at[idx, 'Quantidade'] = estoque_atual - qtd_venda
+                    valor_unit = st.session_state.estoque.at[idx, 'Valor Unitário']
+                    vlr_total = qtd_venda * valor_unit
+                    
+                    nova_venda = pd.DataFrame({
+                        'Data': [datetime.now().strftime("%Y-%m-%d %H:%M")],
+                        'Produto': [prod_venda],
+                        'Quantidade': [qtd_venda],
+                        'Valor Total': [vlr_total]
+                    })
+                    st.session_state.vendas = pd.concat([st.session_state.vendas, nova_venda], ignore_index=True)
+                    
+                    novo_fin = pd.DataFrame({
+                        'Data': [datetime.now().strftime("%Y-%m-%d %H:%M")],
+                        'Descrição': [f"Venda: {prod_venda}"],
+                        'Tipo': ["Entrada"],
+                        'Valor': [vlr_total]
+                    })
+                    st.session_state.financeiro = pd.concat([st.session_state.financeiro, novo_fin], ignore_index=True)
+                    
+                    st.success("Venda registrada com sucesso! Estoque e financeiro atualizados.")
+                    st.rerun()
+                else:
+                    st.error(f"Quantidade em estoque insuficiente! (Disponível: {estoque_atual})")
+        else:
+            st.info("Cadastre produtos no estoque antes de registrar vendas.")
+            btn_venda = st.form_submit_button("Registrar Venda", disabled=True)
+
+    with st.expander("✏️ Editar ou Cancelar Venda (Corrigir Erros)"):
+        if not st.session_state.vendas.empty:
+            df_vendas = st.session_state.vendas.copy()
+            opcoes_venda = []
+            for i, row in df_vendas.iterrows():
+                texto = f"ID: {i} | {row['Data']} | {row['Produto']} | Qtd: {row['Quantidade']} | R$ {row['Valor Total']:.2f}"
+                opcoes_venda.append(texto)
+                
+            venda_selecionada = st.selectbox("Selecione a venda para corrigir:", opcoes_venda)
+            idx_venda = int(venda_selecionada.split("|")[0].replace("ID:", "").strip())
+            
+            venda_atual = st.session_state.vendas.loc[idx_venda]
+            old_prod = venda_atual['Produto']
+            old_qtd = venda_atual['Quantidade']
+            old_date = venda_atual['Data']
+            old_total = venda_atual['Valor Total']
+            
+            lista_produtos = st.session_state.estoque['Produto'].tolist()
+            index_prod = lista_produtos.index(old_prod) if old_prod in lista_produtos else 0
+            
+            with st.form("form_editar_venda"):
+                st.write("**Novos dados da venda:**")
+                novo_prod = st.selectbox("Produto Correto", lista_produtos, index=index_prod)
+                nova_qtd = st.number_input("Quantidade Correta", min_value=1, step=1, value=int(old_qtd))
+                
+                col1, col2 = st.columns(2)
+                btn_salvar_venda = col1.form_submit_button("Salvar Alteração")
+                btn_cancelar_venda = col2.form_submit_button("Cancelar Venda (Estornar tudo)")
+                
+                if btn_cancelar_venda:
+                    if old_prod in st.session_state.estoque['Produto'].values:
+                        idx_est = st.session_state.estoque[st.session_state.estoque['Produto'] == old_prod].index[0]
+                        st.session_state.estoque.at[idx_est, 'Quantidade'] += old_qtd
+                    
+                    filtro_fin = (st.session_state.financeiro['Data'] == old_date) & \
+                                 (st.session_state.financeiro['Descrição'] == f"Venda: {old_prod}") & \
+                                 (st.session_state.financeiro['Valor'] == old_total)
+                    st.session_state.financeiro = st.session_state.financeiro[~filtro_fin].reset_index(drop=True)
+                    st.session_state.vendas = st.session_state.vendas.drop(idx_venda).reset_index(drop=True)
+                    
+                    st.success("Venda cancelada! O produto voltou para o estoque e o valor saiu do financeiro.")
+                    st.rerun()
+                    
+                if btn_salvar_venda:
+                    estoque_temp = st.session_state.estoque.copy()
+                    if old_prod in estoque_temp['Produto'].values:
+                        idx_est_old = estoque_temp[estoque_temp['Produto'] == old_prod].index[0]
+                        estoque_temp.at[idx_est_old, 'Quantidade'] += old_qtd
+                        
+                    idx_est_new = estoque_temp[estoque_temp['Produto'] == novo_prod].index[0]
+                    estoque_disponivel = estoque_temp.at[idx_est_new, 'Quantidade']
+                    
+                    if nova_qtd <= estoque_disponivel:
+                        if old_prod in st.session_state.estoque['Produto'].values:
+                            idx_real_old = st.session_state.estoque[st.session_state.estoque['Produto'] == old_prod].index[0]
+                            st.session_state.estoque.at[idx_real_old, 'Quantidade'] += old_qtd
+                            
+                        idx_real_new = st.session_state.estoque[st.session_state.estoque['Produto'] == novo_prod].index[0]
+                        st.session_state.estoque.at[idx_real_new, 'Quantidade'] -= nova_qtd
+                        
+                        novo_valor_unit = st.session_state.estoque.at[idx_real_new, 'Valor Unitário']
+                        novo_total = nova_qtd * novo_valor_unit
+                        
+                        st.session_state.vendas.at[idx_venda, 'Produto'] = novo_prod
+                        st.session_state.vendas.at[idx_venda, 'Quantidade'] = nova_qtd
+                        st.session_state.vendas.at[idx_venda, 'Valor Total'] = novo_total
+                        
+                        filtro_fin = (st.session_state.financeiro['Data'] == old_date) & \
+                                     (st.session_state.financeiro['Descrição'] == f"Venda: {old_prod}") & \
+                                     (st.session_state.financeiro['Valor'] == old_total)
+                        idx_fin = st.session_state.financeiro[filtro_fin].index
+                        
+                        if not idx_fin.empty:
+                            st.session_state.financeiro.at[idx_fin[0], 'Descrição'] = f"Venda: {novo_prod}"
+                            st.session_state.financeiro.at[idx_fin[0], 'Valor'] = novo_total
+                            
+                        st.success("Venda atualizada com sucesso! Estoque e financeiro foram corrigidos.")
+                        st.rerun()
+                    else:
+                        st.error(f"Estoque insuficiente para '{novo_prod}'! (Disponível: {estoque_disponivel})")
+        else:
+            st.info("Nenhuma venda para editar.")
+
+    st.subheader("Histórico de Vendas")
+    if not st.session_state.vendas.empty:
+        st.dataframe(st.session_state.vendas.style.format({'Valor Total': 'R$ {:.2f}'}), hide_index=True)
+    else:
+        st.info("Nenhuma venda registrada ainda.")
+
+# ==========================================
+# ABA 3: FINANCEIRO
+# ==========================================
+with tab_financeiro:
+    st.subheader("💰 Controle Financeiro")
+    
+    with st.expander("Registrar Transação Manual (Despesas etc.)"):
+        with st.form("form_fin"):
+            desc = st.text_input("Descrição (Ex: Conta de Luz, Material, Fornecedor)")
+            tipo = st.selectbox("Tipo", ["Entrada", "Saída"])
+            valor = st.number_input("Valor (R$)", min_value=0.01, step=0.01)
+            btn_fin = st.form_submit_button("Registrar Transação")
+            
+            if btn_fin and desc:
+                transacao = pd.DataFrame({
+                    'Data': [datetime.now().strftime("%Y-%m-%d %H:%M")],
+                    'Descrição': [desc],
+                    'Tipo': [tipo],
+                    'Valor': [valor]
+                })
+                st.session_state.financeiro = pd.concat([st.session_state.financeiro, transacao], ignore_index=True)
+                st.success("Transação registrada!")
+                st.rerun()
+                
+    with st.expander("🗑️ Remover Transação Manual (Corrigir Erro)"):
+        st.warning("Nota: Para cancelar Vendas, use a aba de Vendas.")
+        if not st.session_state.financeiro.empty:
+            df_fin = st.session_state.financeiro.copy()
+            opcoes_exclusao = []
+            for i, row in df_fin.iterrows():
+                texto = f"ID: {i} | {row['Data']} | {row['Tipo']} | {row['Descrição']} | R$ {row['Valor']:.2f}"
+                opcoes_exclusao.append(texto)
+                
+            transacao_excluir = st.selectbox("Selecione a transação que deseja apagar:", opcoes_exclusao)
+            if st.button("Apagar Registro Selecionado"):
+                idx_excluir = int(transacao_excluir.split("|")[0].replace("ID:", "").strip())
+                st.session_state.financeiro = st.session_state.financeiro.drop(idx_excluir).reset_index(drop=True)
+                st.success("Transação apagada com sucesso!")
+                st.rerun()
+        else:
+            st.info("Não há transações financeiras para remover.")
+
+    dados_fin = st.session_state.financeiro.copy()
+    if not dados_fin.empty:
+        entradas = dados_fin[dados_fin['Tipo'] == 'Entrada']['Valor'].sum()
+        saidas = dados_fin[dados_fin['Tipo'] == 'Saída']['Valor'].sum()
+        saldo = entradas - saidas
+        
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Total Entradas", f"R$ {entradas:.2f}")
+        c2.metric("Total Saídas", f"R$ {saidas:.2f}")
+        c3.metric("Saldo Atual", f"R$ {saldo:.2f}")
+        
+        st.subheader("Extrato")
+        st.dataframe(dados_fin.style.format({'Valor': 'R$ {:.2f}'}), hide_index=True)
+    else:
+        st.info("Nenhuma movimentação financeira registrada.")
+
+# ==========================================
+# ABA 4: FORNECEDORES
+# ==========================================
+with tab_fornecedores:
+    st.subheader("🤝 Cadastro de Fornecedores")
+    with st.expander("Adicionar Fornecedor"):
+        with st.form("form_forn"):
+            nome_forn = st.text_input("Nome do Fornecedor")
+            contato_forn = st.text_input("Contato (Telefone/Email)")
+            cat_forn = st.text_input("Categoria de Produtos Fornecidos")
+            btn_forn = st.form_submit_button("Cadastrar Fornecedor")
+            
+            if btn_forn and nome_forn:
+                novo_forn = pd.DataFrame({
+                    'Nome': [nome_forn],
+                    'Contato': [contato_forn],
+                    'Categoria de Produto': [cat_forn]
+                })
+                st.session_state.fornecedores = pd.concat([st.session_state.fornecedores, novo_forn], ignore_index=True)
+                st.success("Fornecedor cadastrado com sucesso!")
+                st.rerun()
+
+    if not st.session_state.fornecedores.empty:
+        st.dataframe(st.session_state.fornecedores, hide_index=True)
+    else:
+        st.info("Nenhum fornecedor cadastrado.")
+
+# ==========================================
+# ABA 5: CONTROLE DE ACESSO (SUPABASE / OFFLINE)
+# ==========================================
+with tab_acesso:
+    st.subheader("🛡️ Módulo de Controle de Acesso & LGPD")
+    
     sub_cad, sub_reg, sub_hist = st.tabs(["👤 Novo Usuário", "🚪 Registrar Acesso", "📊 Histórico e Sincronização"])
     
     with sub_cad:
@@ -239,7 +509,15 @@ with tab_acesso_menu:
                     st.error("O consentimento da LGPD é estritamente obrigatório.")
                 else:
                     try:
-                        cadastrar_usuario(nome_input, email_input, biometria_input, lgpd_checkbox)
+                        if not check_conexao():
+                            raise Exception("O cadastro de novos usuários exige conexão com a internet.")
+                        dados = {
+                            "nome": nome_input,
+                            "email": email_input,
+                            "biometria_hash": biometria_input,
+                            "consentimento_lgpd": lgpd_checkbox
+                        }
+                        supabase.table("usuarios").insert(dados).execute()
                         st.success(f"Usuário {nome_input} registrado com sucesso!")
                     except Exception as e:
                         st.error(str(e))
@@ -251,7 +529,7 @@ with tab_acesso_menu:
         if usuarios_db:
             opcoes_usuarios = {f"{u['nome']} ({u['email']})": u['id'] for u in usuarios_db}
             
-            with st.form("form_acesso"):
+            with st.form("form_acesso_movimento"):
                 usuario_selecionado = st.selectbox("Selecione o Usuário", options=list(opcoes_usuarios.keys()))
                 tipo_input = st.radio("Direção do Movimento", ["entrada", "saida"], horizontal=True)
                 obs_input = st.text_area("Observações Extras (Opcional)")
@@ -299,110 +577,25 @@ with tab_acesso_menu:
             if st.button("Buscar Últimos Eventos de Acesso"):
                 st.rerun()
                 
-            resposta = supabase.table("registros_acesso").select("*, usuarios(nome)").order("data_hora", desc=True).limit(50).execute()
-            registros_nuvem = resposta.data
-            
-            if registros_nuvem:
-                dados_tabela = []
-                for r in registros_nuvem:
-                    dados_tabela.append({
-                        "Data/Hora": r['data_hora'],
-                        "Usuário": r['usuarios']['nome'] if r.get('usuarios') else 'Desconhecido',
-                        "Movimento": r['tipo_acesso'].upper(),
-                        "Status": r['status_sincronizacao']
-                    })
-                df_nuvem = pd.DataFrame(dados_tabela)
-                df_nuvem['Data/Hora'] = pd.to_datetime(df_nuvem['Data/Hora']).dt.tz_convert('America/Sao_Paulo').dt.strftime('%d/%m/%Y %H:%M:%S')
-                st.dataframe(df_nuvem, use_container_width=True, hide_index=True)
-            else:
-                st.write("Nenhum histórico encontrado no Supabase.")
+            try:
+                resposta = supabase.table("registros_acesso").select("*, usuarios(nome)").order("data_hora", desc=True).limit(50).execute()
+                registros_nuvem = resposta.data
+                
+                if registros_nuvem:
+                    dados_tabela = []
+                    for r in registros_nuvem:
+                        dados_tabela.append({
+                            "Data/Hora": r['data_hora'],
+                            "Usuário": r['usuarios']['nome'] if r.get('usuarios') else 'Desconhecido',
+                            "Movimento": r['tipo_acesso'].upper(),
+                            "Status": r['status_sincronizacao']
+                        })
+                    df_nuvem = pd.DataFrame(dados_tabela)
+                    df_nuvem['Data/Hora'] = pd.to_datetime(df_nuvem['Data/Hora']).dt.tz_convert('America/Sao_Paulo').dt.strftime('%d/%m/%Y %H:%M:%S')
+                    st.dataframe(df_nuvem, use_container_width=True, hide_index=True)
+                else:
+                    st.write("Nenhum histórico encontrado no Supabase.")
+            except Exception as e:
+                st.error(f"Erro ao buscar histórico: {e}")
         else:
             st.write("⚠️ Você precisa de internet para visualizar o histórico consolidado do servidor.")
-
-# --- ABA 2: GESTÃO DE PRODUTOS ---
-with tab_gestao_menu:
-    st.header("📦 Cadastro e Consulta de Produtos")
-    
-    with st.form("form_produto"):
-        col_p1, col_p2 = st.columns(2)
-        with col_p1:
-            nome_produto = st.text_input("Nome do Produto *")
-            preco_produto = st.number_input("Preço Unitário (R$)", min_value=0.0, format="%.2f")
-        with col_p2:
-            cat_produto = st.text_input("Categoria")
-            estoque_produto = st.number_input("Quantidade em Estoque", min_value=0, step=1)
-            
-        submit_prod = st.form_submit_button("Cadastrar Produto")
-        if submit_prod:
-            if not nome_produto:
-                st.warning("O nome do produto é obrigatório.")
-            else:
-                try:
-                    cadastrar_produto(nome_produto, cat_produto, preco_produto, estoque_produto)
-                    st.success(f"Produto '{nome_produto}' cadastrado com sucesso!")
-                except Exception as e:
-                    st.error(f"Erro ao cadastrar produto: {e}")
-                    
-    st.markdown("---")
-    st.subheader("Estoque Atual")
-    produtos_db = buscar_produtos()
-    if produtos_db:
-        df_prod = pd.DataFrame(produtos_db)
-        st.dataframe(df_prod, use_container_width=True, hide_index=True)
-    else:
-        st.info("Nenhum produto cadastrado no momento.")
-
-# --- ABA 3: REGISTRO & HISTÓRICO DE VENDAS ---
-with tab_vendas_menu:
-    st.header("💰 Nova Venda / Saída de Produto")
-    produtos_db = buscar_produtos()
-    
-    if produtos_db:
-        opcoes_produtos = {f"{p['nome']} (Estoque: {p['estoque']} | R$ {p['preco']})": p for p in produtos_db}
-        
-        with st.form("form_venda"):
-            prod_selecionado_str = st.selectbox("Selecione o Produto", options=list(opcoes_produtos.keys()))
-            prod_info = opcoes_produtos[prod_selecionado_str]
-            
-            qtd_venda = st.number_input("Quantidade", min_value=1, max_value=max(1, prod_info['estoque']), step=1)
-            
-            valor_calculado = qtd_venda * prod_info['preco']
-            st.write(f"**Valor Total da Venda:** R$ {valor_calculado:.2f}")
-            
-            submit_venda = st.form_submit_button("Finalizar Venda")
-            if submit_venda:
-                if prod_info['estoque'] < qtd_venda:
-                    st.error("Estoque insuficiente para esta quantidade.")
-                else:
-                    try:
-                        # Registra a venda
-                        registrar_venda(prod_info['id'], qtd_venda, valor_calculado)
-                        
-                        # Opcional: Atualiza o estoque no Supabase
-                        novo_estoque = prod_info['estoque'] - qtd_venda
-                        supabase.table("produtos").update({"estoque": novo_estoque}).eq("id", prod_info['id']).execute()
-                        
-                        st.success(f"✅ Venda registrada com sucesso! Total: R$ {valor_calculado:.2f}")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao registrar venda: {e}")
-    else:
-        st.info("Cadastre produtos na aba de Gestão de Produtos antes de realizar vendas.")
-        
-    st.markdown("---")
-    st.subheader("Histórico de Vendas")
-    vendas_db = buscar_vendas()
-    if vendas_db:
-        dados_vendas_tabela = []
-        for v in vendas_db:
-            dados_vendas_tabela.append({
-                "Data/Hora": v['data_venda'],
-                "Produto": v['produtos']['nome'] if v.get('produtos') else 'Removido',
-                "Quantidade": v['quantidade'],
-                "Valor Total (R$)": f"R$ {v['valor_total']:.2f}"
-            })
-        df_vendas = pd.DataFrame(dados_vendas_tabela)
-        df_vendas['Data/Hora'] = pd.to_datetime(df_vendas['Data/Hora']).dt.tz_convert('America/Sao_Paulo').dt.strftime('%d/%m/%Y %H:%M:%S')
-        st.dataframe(df_vendas, use_container_width=True, hide_index=True)
-    else:
-        st.write("Nenhuma venda registrada ainda.")
