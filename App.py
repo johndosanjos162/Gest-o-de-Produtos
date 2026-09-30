@@ -6,17 +6,102 @@ from supabase import create_client, Client
 # ==========================================
 # CONFIGURAÇÕES INICIAIS E TEMA
 # ==========================================
-st.set_page_config(layout="wide", page_title="Sistema ERP Integrado", page_icon="📦")
+st.set_page_config(layout="wide", page_title="Sistema ERP Integrado | Dashboard", page_icon="📊")
 
+# ==========================================
+# DESIGN SYSTEM / CSS AVANÇADO
+# ==========================================
 st.markdown("""
 <style>
-    /* Estilização Geral */
-    .main { background-color: #f5f7fb; padding: 20px; }
-    .title-text { color: #1f2937; font-weight: 700; font-size: 2.2rem; margin-bottom: 20px; text-align: center; }
-    .stExpander, .stTabs { border: 1px solid #e0e4e8; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); background-color: #ffffff; margin-bottom: 15px; padding: 10px; }
-    .stButton>button { background-color: #4f46e5; color: white; border-radius: 6px; font-weight: 600; border: none; padding: 10px 20px; transition: background-color 0.2s; }
-    .stButton>button:hover { background-color: #4338ca; }
-    .dataframe { border-radius: 8px; overflow: hidden; }
+    /* Estilização Geral do Fundo e Fonte */
+    .main { 
+        background-color: #f8fafc; 
+        padding: 1.5rem; 
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    
+    /* Cabeçalho do Dashboard */
+    .title-container {
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        padding: 2rem;
+        border-radius: 12px;
+        color: white;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        text-align: center;
+    }
+    .title-text { 
+        color: #ffffff; 
+        font-weight: 800; 
+        font-size: 2rem; 
+        margin: 0;
+        letter-spacing: -0.5px;
+    }
+    .subtitle-text {
+        color: #94a3b8;
+        font-size: 0.95rem;
+        margin-top: 5px;
+    }
+
+    /* Cartões de Expansão e Abas */
+    .stExpander { 
+        border: 1px solid #e2e8f0 !important; 
+        border-radius: 10px !important; 
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05); 
+        background-color: #ffffff !important; 
+        margin-bottom: 1rem; 
+        padding: 5px; 
+    }
+    
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: #f1f5f9;
+        padding: 8px;
+        border-radius: 10px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 6px !important;
+        font-weight: 600;
+        color: #475569;
+        background-color: transparent;
+        padding: 10px 16px;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background-color: #ffffff !important;
+        color: #2563eb !important;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    }
+
+    /* Botões Modernizados */
+    .stButton>button { 
+        background-color: #2563eb; 
+        color: white; 
+        border-radius: 8px; 
+        font-weight: 600; 
+        border: none; 
+        padding: 0.5rem 1rem; 
+        transition: all 0.2s ease-in-out;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    }
+    .stButton>button:hover { 
+        background-color: #1d4ed8; 
+        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+    }
+
+    /* Tabelas e Dataframes */
+    .dataframe { 
+        border-radius: 8px; 
+        overflow: hidden; 
+        border: 1px solid #e2e8f0;
+    }
+
+    /* Alertas e Avisos */
+    .stAlert {
+        border-radius: 8px;
+        border: none;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -45,7 +130,10 @@ def tela_login():
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
         st.markdown("<br><br>", unsafe_allow_html=True)
-        st.markdown('<p class="title-text">🔐 Acesso Restrito</p>', unsafe_allow_html=True)
+        st.markdown("""
+            <div style="background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;">
+                <h2 style="text-align: center; color: #1e293b; margin-bottom: 20px;">🔐 Acesso Restrito</h2>
+        """, unsafe_allow_html=True)
         with st.form("form_login"):
             usuario = st.text_input("Usuário")
             senha = st.text_input("Senha", type="password")
@@ -58,23 +146,31 @@ def tela_login():
                     st.rerun()
                 else:
                     st.error("Usuário ou senha incorretos.")
+        st.markdown("</div>", unsafe_allow_html=True)
 
 if not st.session_state.autenticado:
     tela_login()
     st.stop()
 
 # ==========================================
-# BOTÃO DE LOGOUT NA BARRA LATERAL
+# BARRA LATERAL (SIDEBAR)
 # ==========================================
 with st.sidebar:
+    st.markdown("### 🏢 Painel de Controle")
     st.write(f"Logado como: **Administrador**")
-    if st.button("🚪 Sair do Sistema"):
+    if st.button("🚪 Sair do Sistema", use_container_width=True):
         st.session_state.autenticado = False
         st.rerun()
     st.markdown("---")
-    st.success("🟢 Conectado ao Supabase")
+    st.success("🟢 Supabase Conectado")
 
-st.markdown('<p class="title-text">📦 Sistema ERP Integrado (Nuvem)</p>', unsafe_allow_html=True)
+# Cabeçalho Principal do Dashboard
+st.markdown("""
+    <div class="title-container">
+        <p class="title-text">📊 Sistema ERP Integrado</p>
+        <p class="subtitle-text">Gestão centralizada de Estoque, Vendas, Financeiro e Fornecedores em tempo real</p>
+    </div>
+""", unsafe_allow_html=True)
 
 # ==========================================
 # FUNÇÕES DE BUSCA DO BANCO DE DADOS
@@ -103,7 +199,7 @@ if df_financeiro.empty:
 if df_fornecedores.empty:
     df_fornecedores = pd.DataFrame(columns=['id', 'nome', 'contato', 'categoria_produto'])
 
-# Padronizar nomes de colunas visualmente se necessário
+# Padronizar nomes de colunas visualmente
 if 'Produto' not in df_estoque.columns and 'produto' in df_estoque.columns:
     df_estoque = df_estoque.rename(columns={
         'produto': 'Produto',
@@ -152,7 +248,7 @@ tab_estoque, tab_vendas, tab_financeiro, tab_fornecedores = st.tabs([
 with tab_estoque:
     st.subheader("📦 Gestão de Estoque")
     
-    with st.expander("Adicionar Novo Produto"):
+    with st.expander("➕ Adicionar Novo Produto"):
         with st.form("form_produto"):
             col1, col2 = st.columns(2)
             with col1:
@@ -186,7 +282,7 @@ with tab_estoque:
                     except Exception as e:
                         st.error(f"Erro ao salvar produto: {e}")
 
-    with st.expander("Atualizar Estoque e Preço"):
+    with st.expander("🔄 Atualizar Estoque e Preço"):
         if not df_estoque.empty:
             produtos_disponiveis = df_estoque['Produto'].tolist()
             produto_selecionado = st.selectbox("Selecione o produto para atualizar:", produtos_disponiveis, key="select_update")
@@ -212,7 +308,7 @@ with tab_estoque:
         else:
             st.info("Nenhum produto cadastrado para atualizar.")
 
-    with st.expander("Remover Produto"):
+    with st.expander("🗑️ Remover Produto"):
         if not df_estoque.empty:
             produtos_disponiveis_remover = df_estoque['Produto'].tolist()
             produto_remover = st.selectbox("Selecione o produto para remover:", produtos_disponiveis_remover, key="select_remove")
@@ -236,8 +332,8 @@ with tab_estoque:
                 st.error(f"📉 **{row['Produto']}**: Restam apenas {row['Quantidade']} unidades (Limite: {row['Limite Mínimo']})")
         
         dados_est['Valor Total'] = dados_est['Quantidade'] * dados_est['Valor Unitário']
-        st.subheader("Estoque Atual")
-        st.dataframe(dados_est[['Produto', 'Categoria', 'Quantidade', 'Limite Mínimo', 'Valor Unitário', 'Valor Total']].style.format({'Valor Unitário': 'R$ {:.2f}', 'Valor Total': 'R$ {:.2f}'}), hide_index=True)
+        st.markdown("### 📋 Visão Geral do Estoque")
+        st.dataframe(dados_est[['Produto', 'Categoria', 'Quantidade', 'Limite Mínimo', 'Valor Unitário', 'Valor Total']].style.format({'Valor Unitário': 'R$ {:.2f}', 'Valor Total': 'R$ {:.2f}'}), use_container_width=True, hide_index=True)
     else:
         st.info("Seu estoque está vazio no momento.")
 
@@ -265,18 +361,13 @@ with tab_vendas:
                     data_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     
                     try:
-                        # Atualiza estoque
                         supabase.table("estoque").update({"quantidade": novo_estoque}).eq("id", item_id).execute()
-                        
-                        # Registra venda
                         supabase.table("vendas").insert({
                             "data": data_str,
                             "produto": prod_venda,
                             "quantidade": int(qtd_venda),
                             "valor_total": float(vlr_total)
                         }).execute()
-                        
-                        # Registra no financeiro (Entrada)
                         supabase.table("financeiro").insert({
                             "data": data_str,
                             "descricao": f"Venda: {prod_venda}",
@@ -323,16 +414,13 @@ with tab_vendas:
                 
                 if btn_cancelar_venda:
                     try:
-                        # Devolve quantidade ao estoque se o produto ainda existir
                         if not df_estoque.empty and old_prod in df_estoque['Produto'].values:
                             est_item = df_estoque[df_estoque['Produto'] == old_prod].iloc[0]
                             novo_qtd_est = int(est_item['Quantidade']) + old_qtd
                             supabase.table("estoque").update({"quantidade": novo_qtd_est}).eq("id", est_item['id']).execute()
                         
-                        # Remove a venda
                         supabase.table("vendas").delete().eq("id", venda_atual['id']).execute()
                         
-                        # Remove transação financeira correspondente
                         fin_match = df_financeiro[(df_financeiro['Descrição'] == f"Venda: {old_prod}") & (df_financeiro['Valor'] == old_total)]
                         if not fin_match.empty:
                             supabase.table("financeiro").delete().eq("id", fin_match.iloc[0]['id']).execute()
@@ -344,7 +432,6 @@ with tab_vendas:
                     
                 if btn_salvar_venda:
                     try:
-                        # Lógica simplificada de estorno e nova baixa
                         if not df_estoque.empty and old_prod in df_estoque['Produto'].values:
                             est_old = df_estoque[df_estoque['Produto'] == old_prod].iloc[0]
                             supabase.table("estoque").update({"quantidade": int(est_old['Quantidade']) + old_qtd}).eq("id", est_old['id']).execute()
@@ -357,7 +444,6 @@ with tab_vendas:
                             novo_total = nova_qtd * float(est_new['Valor Unitário'])
                             
                             supabase.table("estoque").update({"quantidade": novo_estoque_val}).eq("id", est_new['id']).execute()
-                            
                             supabase.table("vendas").update({
                                 "produto": novo_prod,
                                 "quantidade": int(nova_qtd),
@@ -380,9 +466,9 @@ with tab_vendas:
         else:
             st.info("Nenhuma venda para editar.")
 
-    st.subheader("Histórico de Vendas")
+    st.markdown("### 📊 Histórico de Vendas")
     if not df_vendas.empty:
-        st.dataframe(df_vendas[['Data', 'Produto', 'Quantidade', 'Valor Total']].style.format({'Valor Total': 'R$ {:.2f}'}), hide_index=True)
+        st.dataframe(df_vendas[['Data', 'Produto', 'Quantidade', 'Valor Total']].style.format({'Valor Total': 'R$ {:.2f}'}), use_container_width=True, hide_index=True)
     else:
         st.info("Nenhuma venda registrada ainda.")
 
@@ -392,7 +478,7 @@ with tab_vendas:
 with tab_financeiro:
     st.subheader("💰 Controle Financeiro")
     
-    with st.expander("Registrar Transação Manual (Despesas etc.)"):
+    with st.expander("➕ Registrar Transação Manual (Despesas etc.)"):
         with st.form("form_fin"):
             desc = st.text_input("Descrição (Ex: Conta de Luz, Material, Fornecedor)")
             tipo = st.selectbox("Tipo", ["Entrada", "Saída"])
@@ -439,12 +525,12 @@ with tab_financeiro:
         saldo = entradas - saidas
         
         c1, c2, c3 = st.columns(3)
-        c1.metric("Total Entradas", f"R$ {entradas:.2f}")
-        c2.metric("Total Saídas", f"R$ {saidas:.2f}")
-        c3.metric("Saldo Atual", f"R$ {saldo:.2f}")
+        c1.metric("📥 Total Entradas", f"R$ {entradas:.2f}")
+        c2.metric("📤 Total Saídas", f"R$ {saidas:.2f}")
+        c3.metric("💳 Saldo Atual", f"R$ {saldo:.2f}")
         
-        st.subheader("Extrato")
-        st.dataframe(dados_fin[['Data', 'Descrição', 'Tipo', 'Valor']].style.format({'Valor': 'R$ {:.2f}'}), hide_index=True)
+        st.markdown("### 📋 Extrato Financeiro Consolidado")
+        st.dataframe(dados_fin[['Data', 'Descrição', 'Tipo', 'Valor']].style.format({'Valor': 'R$ {:.2f}'}), use_container_width=True, hide_index=True)
     else:
         st.info("Nenhuma movimentação financeira registrada.")
 
@@ -453,7 +539,7 @@ with tab_financeiro:
 # ==========================================
 with tab_fornecedores:
     st.subheader("🤝 Cadastro de Fornecedores")
-    with st.expander("Adicionar Fornecedor"):
+    with st.expander("➕ Adicionar Fornecedor"):
         with st.form("form_forn"):
             nome_forn = st.text_input("Nome do Fornecedor")
             contato_forn = st.text_input("Contato (Telefone/Email)")
@@ -472,7 +558,8 @@ with tab_fornecedores:
                 except Exception as e:
                     st.error(f"Erro ao cadastrar fornecedor: {e}")
 
+    st.markdown("### 📋 Lista de Fornecedores Ativos")
     if not df_fornecedores.empty:
-        st.dataframe(df_fornecedores[['Nome', 'Contato', 'Categoria de Produto']], hide_index=True)
+        st.dataframe(df_fornecedores[['Nome', 'Contato', 'Categoria de Produto']], use_container_width=True, hide_index=True)
     else:
         st.info("Nenhum fornecedor cadastrado.")
