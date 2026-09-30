@@ -22,6 +22,46 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ==========================================
+# CONTROLE DE SESSÃO / AUTENTICAÇÃO
+# ==========================================
+if 'autenticado' not in st.session_state:
+    st.session_state.autenticado = False
+
+def tela_login():
+    col1, col2, col3 = st.columns([1, 1.2, 1])
+    with col2:
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.markdown('<p class="title-text">🔐 Acesso Restrito</p>', unsafe_allow_html=True)
+        with st.form("form_login"):
+            usuario = st.text_input("Usuário")
+            senha = st.text_input("Senha", type="password")
+            botao_login = st.form_submit_button("Entrar no Sistema", use_container_width=True)
+            
+            if botao_login:
+                # Defina aqui suas credenciais de acesso padrão (ou valide via Supabase/Banco)
+                if usuario == "admin" and senha == "admin123":
+                    st.session_state.autenticado = True
+                    st.success("Login realizado com sucesso!")
+                    st.rerun()
+                else:
+                    st.error("Usuário ou senha incorretos.")
+
+# Se não estiver autenticado, exibe apenas a tela de login e interrompe a execução
+if not st.session_state.autenticado:
+    tela_login()
+    st.stop()
+
+# ==========================================
+# BOTÃO DE LOGOUT NA BARRA LATERAL
+# ==========================================
+with st.sidebar:
+    st.write(f"Logado como: **Administrador**")
+    if st.button("🚪 Sair do Sistema"):
+        st.session_state.autenticado = False
+        st.rerun()
+    st.markdown("---")
+
 st.markdown('<p class="title-text">🛡️ Sistema Integrado: ERP & Controle de Acesso</p>', unsafe_allow_html=True)
 
 # ==========================================
