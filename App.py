@@ -52,7 +52,6 @@ with tab_estoque:
             btn_adicionar = st.form_submit_button("Cadastrar Produto")
             
             if btn_adicionar and nome:
-                # VERIFICAÇÃO PARA IMPEDIR PRODUTOS DUPLICADOS
                 produto_existe = st.session_state.estoque['Produto'].str.lower().eq(nome.lower()).any()
                 
                 if produto_existe:
@@ -102,17 +101,15 @@ with tab_estoque:
 
     dados_est = st.session_state.estoque.copy()
     
-    # === NOVO: SISTEMA DE ALERTA DE ESTOQUE ===
+    # SISTEMA DE ALERTA DE ESTOQUE
     if not dados_est.empty:
-        # Filtra os produtos que estão com quantidade menor ou igual ao limite
         produtos_em_alerta = dados_est[dados_est['Quantidade'] <= dados_est['Limite Mínimo']]
-        
         if not produtos_em_alerta.empty:
             st.warning("⚠️ **Atenção: Os seguintes produtos estão com estoque baixo!**")
             for _, row in produtos_em_alerta.iterrows():
                 st.error(f"📉 **{row['Produto']}**: Restam apenas {row['Quantidade']} unidades (Limite: {row['Limite Mínimo']})")
     
-    # === EXIBIÇÃO DA TABELA ===
+    # EXIBIÇÃO DA TABELA
     if not dados_est.empty:
         dados_est['Valor Total'] = dados_est['Quantidade'] * dados_est['Valor Unitário']
         st.subheader("Estoque Atual")
@@ -125,6 +122,8 @@ with tab_estoque:
 # ==========================================
 with tab_vendas:
     st.subheader("🛒 Registro de Vendas")
+    
+    # REGISTRAR NOVA VENDA
     with st.form("form_venda"):
         if not st.session_state.estoque.empty:
             prod_venda = st.selectbox("Produto Vendido", st.session_state.estoque['Produto'].tolist())
@@ -164,6 +163,106 @@ with tab_vendas:
             st.info("Cadastre produtos no estoque antes de registrar vendas.")
             btn_venda = st.form_submit_button("Registrar Venda", disabled=True)
 
+    # NOVO: EDITAR OU CANCELAR VENDA
+    with st.expander("✏️ Editar ou Cancelar Venda (Corrigir Erros)"):
+        if not st.session_state.vendas.empty:
+            df_vendas = st.session_state.vendas.copy()
+            opcoes_venda = []
+            
+            # Cria lista para seleção
+            for i, row in df_vendas.iterrows():
+                texto = f"ID: {i} | {row['Data']} | {row['Produto']} | Qtd: {row['Quantidade']} | R$ {row['Valor Total']:.2f}"
+                opcoes_venda.append(texto)
+                
+            venda_selecionada = st.selectbox("Selecione a venda para corrigir:", opcoes_venda)
+            idx_venda = int(venda_selecionada.split("|")[0].replace("ID:", "").strip())
+            
+            # Pega os dados atuais da venda selecionada
+            venda_atual = st.session_state.vendas.loc[idx_venda]
+            old_prod = venda_atual['Produto']
+            old_qtd = venda_atual['Quantidade']
+            old_date = venda_atual['Data']
+            old_total = venda_atual['Valor Total']
+            
+            # Verifica se o produto antigo ainda existe na lista do estoque
+            lista_produtos = st.session_state.estoque['Produto'].tolist()
+            index_prod = lista_produtos.index(old_prod) if old_prod in lista_produtos else 0
+            
+            with st.form("form_editar_venda"):
+                st.write("**Novos dados da venda:**")
+                novo_prod = st.selectbox("Produto Correto", lista_produtos, index=index_prod)
+                nova_qtd = st.number_input("Quantidade Correta", min_value=1, step=1, value=int(old_qtd))
+                
+                col1, col2 = st.columns(2)
+                btn_salvar_venda = col1.form_submit_button("Salvar Alteração")
+                btn_cancelar_venda = col2.form_submit_button("Cancelar Venda (Estornar tudo)")
+                
+                if btn_cancelar_venda:
+                    # 1. Devolve ao estoque
+                    if old_prod in st.session_state.estoque['Produto'].values:
+                        idx_est = st.session_state.estoque[st.session_state.estoque['Produto'] == old_prod].index[0]
+                        st.session_state.estoque.at[idx_est, 'Quantidade'] += old_qtd
+                    
+                    # 2. Remove do financeiro
+                    filtro_fin = (st.session_state.financeiro['Data'] == old_date) & \
+                                 (st.session_state.financeiro['Descrição'] == f"Venda: {old_prod}") & \
+                                 (st.session_state.financeiro['Valor'] == old_total)
+                    st.session_state.financeiro = st.session_state.financeiro[~filtro_fin].reset_index(drop=True)
+                    
+                    # 3. Remove da tabela de vendas
+                    st.session_state.vendas = st.session_state.vendas.drop(idx_venda).reset_index(drop=True)
+                    
+                    st.success("Venda cancelada! O produto voltou para o estoque e o valor saiu do financeiro.")
+                    st.rerun()
+                    
+                if btn_salvar_venda:
+                    # Simula o estoque para ver se a troca é possível
+                    estoque_temp = st.session_state.estoque.copy()
+                    
+                    # Devolve o estoque antigo virtualmente
+                    if old_prod in estoque_temp['Produto'].values:
+                        idx_est_old = estoque_temp[estoque_temp['Produto'] == old_prod].index[0]
+                        estoque_temp.at[idx_est_old, 'Quantidade'] += old_qtd
+                        
+                    # Verifica se tem saldo do novo produto
+                    idx_est_new = estoque_temp[estoque_temp['Produto'] == novo_prod].index[0]
+                    estoque_disponivel = estoque_temp.at[idx_est_new, 'Quantidade']
+                    
+                    if nova_qtd <= estoque_disponivel:
+                        # 1. Efetiva devolução do antigo
+                        if old_prod in st.session_state.estoque['Produto'].values:
+                            idx_real_old = st.session_state.estoque[st.session_state.estoque['Produto'] == old_prod].index[0]
+                            st.session_state.estoque.at[idx_real_old, 'Quantidade'] += old_qtd
+                            
+                        # 2. Efetiva retirada do novo
+                        idx_real_new = st.session_state.estoque[st.session_state.estoque['Produto'] == novo_prod].index[0]
+                        st.session_state.estoque.at[idx_real_new, 'Quantidade'] -= nova_qtd
+                        
+                        novo_valor_unit = st.session_state.estoque.at[idx_real_new, 'Valor Unitário']
+                        novo_total = nova_qtd * novo_valor_unit
+                        
+                        # 3. Atualiza tabela de vendas
+                        st.session_state.vendas.at[idx_venda, 'Produto'] = novo_prod
+                        st.session_state.vendas.at[idx_venda, 'Quantidade'] = nova_qtd
+                        st.session_state.vendas.at[idx_venda, 'Valor Total'] = novo_total
+                        
+                        # 4. Atualiza financeiro
+                        filtro_fin = (st.session_state.financeiro['Data'] == old_date) & \
+                                     (st.session_state.financeiro['Descrição'] == f"Venda: {old_prod}") & \
+                                     (st.session_state.financeiro['Valor'] == old_total)
+                        idx_fin = st.session_state.financeiro[filtro_fin].index
+                        
+                        if not idx_fin.empty:
+                            st.session_state.financeiro.at[idx_fin[0], 'Descrição'] = f"Venda: {novo_prod}"
+                            st.session_state.financeiro.at[idx_fin[0], 'Valor'] = novo_total
+                            
+                        st.success("Venda atualizada com sucesso! Estoque e financeiro foram corrigidos automaticamente.")
+                        st.rerun()
+                    else:
+                        st.error(f"Estoque insuficiente para '{novo_prod}'! (Disponível: {estoque_disponivel})")
+        else:
+            st.info("Nenhuma venda para editar.")
+
     st.subheader("Histórico de Vendas")
     if not st.session_state.vendas.empty:
         st.dataframe(st.session_state.vendas.style.format({'Valor Total': 'R$ {:.2f}'}), hide_index=True)
@@ -194,7 +293,8 @@ with tab_financeiro:
                 st.success("Transação registrada!")
                 st.rerun()
                 
-    with st.expander("🗑️ Remover Transação (Corrigir Erro)"):
+    with st.expander("🗑️ Remover Transação Manual (Corrigir Erro)"):
+        st.warning("Nota: Para cancelar Vendas, use a aba de Vendas. Use este espaço para corrigir despesas ou entradas manuais.")
         if not st.session_state.financeiro.empty:
             df_fin = st.session_state.financeiro.copy()
             opcoes_exclusao = []
