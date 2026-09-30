@@ -8,49 +8,12 @@ st.set_page_config(layout="wide", page_title="Sistema ERP Integrado")
 st.markdown("""
 <style>
     /* Estilização Geral */
-    .main {
-        background-color: #f5f7fb;
-        padding: 20px;
-    }
-    
-    /* Cabeçalho */
-    .title-text {
-        color: #1f2937;
-        font-weight: 700;
-        font-size: 2.2rem;
-        margin-bottom: 20px;
-        text-align: center;
-    }
-
-    /* Cards e Expanders */
-    .stExpander, .stTabs {
-        border: 1px solid #e0e4e8;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        background-color: #ffffff;
-        margin-bottom: 15px;
-        padding: 10px;
-    }
-
-    /* Botões */
-    .stButton>button {
-        background-color: #4f46e5;
-        color: white;
-        border-radius: 6px;
-        font-weight: 600;
-        border: none;
-        padding: 10px 20px;
-        transition: background-color 0.2s;
-    }
-    .stButton>button:hover {
-        background-color: #4338ca;
-    }
-
-    /* Tabelas */
-    .dataframe {
-        border-radius: 8px;
-        overflow: hidden;
-    }
+    .main { background-color: #f5f7fb; padding: 20px; }
+    .title-text { color: #1f2937; font-weight: 700; font-size: 2.2rem; margin-bottom: 20px; text-align: center; }
+    .stExpander, .stTabs { border: 1px solid #e0e4e8; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); background-color: #ffffff; margin-bottom: 15px; padding: 10px; }
+    .stButton>button { background-color: #4f46e5; color: white; border-radius: 6px; font-weight: 600; border: none; padding: 10px 20px; transition: background-color 0.2s; }
+    .stButton>button:hover { background-color: #4338ca; }
+    .dataframe { border-radius: 8px; overflow: hidden; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -58,52 +21,52 @@ st.markdown('<p class="title-text">🏢 Sistema ERP Integrado</p>', unsafe_allow
 
 # Inicialização do Session State
 if 'estoque' not in st.session_state:
-    st.session_state.estoque = pd.DataFrame(
-        columns=['Produto', 'Categoria', 'Quantidade', 'Limite Mínimo', 'Valor Unitário']
-    )
+    st.session_state.estoque = pd.DataFrame(columns=['Produto', 'Categoria', 'Quantidade', 'Limite Mínimo', 'Valor Unitário'])
 if 'vendas' not in st.session_state:
-    st.session_state.vendas = pd.DataFrame(
-        columns=['Data', 'Produto', 'Quantidade', 'Valor Total']
-    )
+    st.session_state.vendas = pd.DataFrame(columns=['Data', 'Produto', 'Quantidade', 'Valor Total'])
 if 'financeiro' not in st.session_state:
-    st.session_state.financeiro = pd.DataFrame(
-        columns=['Data', 'Descrição', 'Tipo', 'Valor']
-    )
+    st.session_state.financeiro = pd.DataFrame(columns=['Data', 'Descrição', 'Tipo', 'Valor'])
 if 'fornecedores' not in st.session_state:
-    st.session_state.fornecedores = pd.DataFrame(
-        columns=['Nome', 'Contato', 'Categoria de Produto']
-    )
+    st.session_state.fornecedores = pd.DataFrame(columns=['Nome', 'Contato', 'Categoria de Produto'])
 
-tab_estoque, tab_vendas, tab_financeiro, tab_fornecedores = st.tabs(["Estoque", "Vendas", "Financeiro", "Fornecedores"])
+# Criação das 4 Abas principais
+tab_estoque, tab_vendas, tab_financeiro, tab_fornecedores = st.tabs(["📦 Estoque", "🛒 Vendas", "💰 Financeiro", "🤝 Fornecedores"])
 
+# ABA 1: ESTOQUE
 with tab_estoque:
     st.subheader("📦 Gestão de Estoque")
+    
     with st.expander("Adicionar Novo Produto"):
         with st.form("form_produto"):
             col1, col2 = st.columns(2)
             with col1:
                 nome = st.text_input("Nome do Produto")
-                categoria = st.selectbox(
-                    "Categoria",
-                    ["Grãos", "Massas", "Óleos e Condimentos", "Bebidas", "Outros"]
-                )
+                categoria = st.selectbox("Categoria", ["Grãos", "Massas", "Óleos e Condimentos", "Bebidas", "Outros"])
                 preco = st.number_input("Valor Unitário (R$)", min_value=0.0, step=0.01)
             with col2:
                 qtd = st.number_input("Quantidade Inicial", min_value=0, step=1)
                 limite = st.number_input("Limite Mínimo de Alerta", min_value=0, step=1)
             
             btn_adicionar = st.form_submit_button("Cadastrar Produto")
+            
             if btn_adicionar and nome:
-                novo_item = pd.DataFrame({
-                    'Produto': [nome],
-                    'Categoria': [categoria],
-                    'Quantidade': [qtd],
-                    'Limite Mínimo': [limite],
-                    'Valor Unitário': [preco]
-                })
-                st.session_state.estoque = pd.concat([st.session_state.estoque, novo_item], ignore_index=True)
-                st.success("Produto cadastrado com sucesso!")
-                st.rerun()
+                # VERIFICAÇÃO PARA IMPEDIR PRODUTOS DUPLICADOS
+                # Converte tudo para minúsculo para evitar que "Feijão" e "feijão" sejam aceitos juntos
+                produto_existe = st.session_state.estoque['Produto'].str.lower().eq(nome.lower()).any()
+                
+                if produto_existe:
+                    st.error(f"⚠️️ Erro: O produto '{nome}' já está cadastrado no estoque!")
+                else:
+                    novo_item = pd.DataFrame({
+                        'Produto': [nome.strip()],
+                        'Categoria': [categoria],
+                        'Quantidade': [qtd],
+                        'Limite Mínimo': [limite],
+                        'Valor Unitário': [preco]
+                    })
+                    st.session_state.estoque = pd.concat([st.session_state.estoque, novo_item], ignore_index=True)
+                    st.success("✅ Produto cadastrado com sucesso!")
+                    st.rerun()
 
     with st.expander("Atualizar Estoque e Preço"):
         if not st.session_state.estoque.empty:
@@ -141,7 +104,10 @@ with tab_estoque:
         dados_est['Valor Total'] = dados_est['Quantidade'] * dados_est['Valor Unitário']
         st.subheader("Estoque Atual")
         st.dataframe(dados_est.style.format({'Valor Unitário': 'R$ {:.2f}', 'Valor Total': 'R$ {:.2f}'}), hide_index=True)
+    else:
+        st.info("Seu estoque está vazio no momento.")
 
+# ABA 2: VENDAS
 with tab_vendas:
     st.subheader("🛒 Registro de Vendas")
     with st.form("form_venda"):
@@ -153,11 +119,14 @@ with tab_vendas:
             if btn_venda:
                 idx = st.session_state.estoque[st.session_state.estoque['Produto'] == prod_venda].index[0]
                 estoque_atual = st.session_state.estoque.at[idx, 'Quantidade']
+                
                 if qtd_venda <= estoque_atual:
+                    # Dá baixa no estoque
                     st.session_state.estoque.at[idx, 'Quantidade'] = estoque_atual - qtd_venda
                     valor_unit = st.session_state.estoque.at[idx, 'Valor Unitário']
                     vlr_total = qtd_venda * valor_unit
                     
+                    # Registra a venda
                     nova_venda = pd.DataFrame({
                         'Data': [datetime.now().strftime("%Y-%m-%d %H:%M")],
                         'Produto': [prod_venda],
@@ -166,7 +135,7 @@ with tab_vendas:
                     })
                     st.session_state.vendas = pd.concat([st.session_state.vendas, nova_venda], ignore_index=True)
                     
-                    # Registra no financeiro
+                    # Registra no financeiro como "Entrada"
                     novo_fin = pd.DataFrame({
                         'Data': [datetime.now().strftime("%Y-%m-%d %H:%M")],
                         'Descrição': [f"Venda: {prod_venda}"],
@@ -175,24 +144,30 @@ with tab_vendas:
                     })
                     st.session_state.financeiro = pd.concat([st.session_state.financeiro, novo_fin], ignore_index=True)
                     
-                    st.success("Venda registrada com sucesso!")
+                    st.success("Venda registrada com sucesso! Estoque e financeiro atualizados.")
                     st.rerun()
                 else:
-                    st.error("Quantidade em estoque insuficiente!")
+                    st.error(f"Quantidade em estoque insuficiente! (Disponível: {estoque_atual})")
         else:
             st.info("Cadastre produtos no estoque antes de registrar vendas.")
+            btn_venda = st.form_submit_button("Registrar Venda", disabled=True)
 
     st.subheader("Histórico de Vendas")
-    st.dataframe(st.session_state.vendas.style.format({'Valor Total': 'R$ {:.2f}'}), hide_index=True)
+    if not st.session_state.vendas.empty:
+        st.dataframe(st.session_state.vendas.style.format({'Valor Total': 'R$ {:.2f}'}), hide_index=True)
+    else:
+        st.info("Nenhuma venda registrada ainda.")
 
+# ABA 3: FINANCEIRO
 with tab_financeiro:
     st.subheader("💰 Controle Financeiro")
-    with st.expander("Registrar Transação Manual"):
+    with st.expander("Registrar Transação Manual (Despesas etc.)"):
         with st.form("form_fin"):
-            desc = st.text_input("Descrição")
+            desc = st.text_input("Descrição (Ex: Conta de Luz, Material)")
             tipo = st.selectbox("Tipo", ["Entrada", "Saída"])
-            valor = st.number_input("Valor (R$)", min_value=0.0, step=0.01)
+            valor = st.number_input("Valor (R$)", min_value=0.01, step=0.01)
             btn_fin = st.form_submit_button("Registrar Transação")
+            
             if btn_fin and desc:
                 transacao = pd.DataFrame({
                     'Data': [datetime.now().strftime("%Y-%m-%d %H:%M")],
@@ -206,7 +181,6 @@ with tab_financeiro:
 
     dados_fin = st.session_state.financeiro.copy()
     if not dados_fin.empty:
-        st.dataframe(dados_fin.style.format({'Valor': 'R$ {:.2f}'}), hide_index=True)
         entradas = dados_fin[dados_fin['Tipo'] == 'Entrada']['Valor'].sum()
         saidas = dados_fin[dados_fin['Tipo'] == 'Saída']['Valor'].sum()
         saldo = entradas - saidas
@@ -215,15 +189,22 @@ with tab_financeiro:
         c1.metric("Total Entradas", f"R$ {entradas:.2f}")
         c2.metric("Total Saídas", f"R$ {saidas:.2f}")
         c3.metric("Saldo Atual", f"R$ {saldo:.2f}")
+        
+        st.subheader("Extrato")
+        st.dataframe(dados_fin.style.format({'Valor': 'R$ {:.2f}'}), hide_index=True)
+    else:
+        st.info("Nenhuma movimentação financeira registrada.")
 
+# ABA 4: FORNECEDORES
 with tab_fornecedores:
     st.subheader("🤝 Cadastro de Fornecedores")
-    with st.expander("Adicionar Forncedor"):
+    with st.expander("Adicionar Fornecedor"):
         with st.form("form_forn"):
             nome_forn = st.text_input("Nome do Fornecedor")
             contato_forn = st.text_input("Contato (Telefone/Email)")
             cat_forn = st.text_input("Categoria de Produtos Fornecidos")
             btn_forn = st.form_submit_button("Cadastrar Fornecedor")
+            
             if btn_forn and nome_forn:
                 novo_forn = pd.DataFrame({
                     'Nome': [nome_forn],
@@ -234,4 +215,7 @@ with tab_fornecedores:
                 st.success("Fornecedor cadastrado com sucesso!")
                 st.rerun()
 
-    st.dataframe(st.session_state.fornecedores, hide_index=True)
+    if not st.session_state.fornecedores.empty:
+        st.dataframe(st.session_state.fornecedores, hide_index=True)
+    else:
+        st.info("Nenhum fornecedor cadastrado.")
