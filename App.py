@@ -6,101 +6,119 @@ from supabase import create_client, Client
 # ==========================================
 # CONFIGURAÇÕES INICIAIS E TEMA
 # ==========================================
-st.set_page_config(layout="wide", page_title="Sistema ERP Integrado | Dashboard", page_icon="📊")
+st.set_page_config(layout="wide", page_title="Cyber ERP | Security & Operations", page_icon="⚡")
 
 # ==========================================
-# DESIGN SYSTEM / CSS AVANÇADO
+# DESIGN SYSTEM / CSS FUTURISTA & TECH
 # ==========================================
 st.markdown("""
 <style>
-    /* Estilização Geral do Fundo e Fonte */
+    /* Fundo Geral Tech Dark */
     .main { 
-        background-color: #f8fafc; 
+        background-color: #060913; 
         padding: 1.5rem; 
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        color: #f1f5f9;
     }
     
-    /* Cabeçalho do Dashboard */
+    /* Cabeçalho Tecnológico */
     .title-container {
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-        padding: 2rem;
-        border-radius: 12px;
+        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+        padding: 2.5rem;
+        border-radius: 16px;
         color: white;
         margin-bottom: 2rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        border: 1px solid rgba(56, 189, 248, 0.2);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(56, 189, 248, 0.1);
         text-align: center;
     }
     .title-text { 
-        color: #ffffff; 
+        color: #38bdf8; 
         font-weight: 800; 
-        font-size: 2rem; 
+        font-size: 2.3rem; 
         margin: 0;
         letter-spacing: -0.5px;
+        text-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
     }
     .subtitle-text {
         color: #94a3b8;
-        font-size: 0.95rem;
-        margin-top: 5px;
+        font-size: 1rem;
+        margin-top: 8px;
     }
 
-    /* Cartões de Expansão e Abas */
+    /* Expander e Containers com Estilo Glassmorphism */
     .stExpander { 
-        border: 1px solid #e2e8f0 !important; 
-        border-radius: 10px !important; 
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05); 
-        background-color: #ffffff !important; 
+        border: 1px solid rgba(56, 189, 248, 0.2) !important; 
+        border-radius: 12px !important; 
+        background-color: #0b1120 !important; 
         margin-bottom: 1rem; 
-        padding: 5px; 
+        padding: 8px; 
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
     }
     
+    /* Abas Customizadas */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background-color: #f1f5f9;
-        padding: 8px;
-        border-radius: 10px;
+        gap: 10px;
+        background-color: #0b1120;
+        padding: 10px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
     }
     
     .stTabs [data-baseweb="tab"] {
-        border-radius: 6px !important;
+        border-radius: 8px !important;
         font-weight: 600;
-        color: #475569;
+        color: #94a3b8;
         background-color: transparent;
-        padding: 10px 16px;
+        padding: 10px 18px;
+        transition: all 0.3s ease;
     }
     
     .stTabs [aria-selected="true"] {
-        background-color: #ffffff !important;
-        color: #2563eb !important;
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important;
+        color: #ffffff !important;
+        box-shadow: 0 0 15px rgba(37, 99, 235, 0.4);
     }
 
-    /* Botões Modernizados */
+    /* Botões Futuristas */
     .stButton>button { 
-        background-color: #2563eb; 
+        background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); 
         color: white; 
         border-radius: 8px; 
         font-weight: 600; 
-        border: none; 
-        padding: 0.5rem 1rem; 
-        transition: all 0.2s ease-in-out;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(56, 189, 248, 0.3); 
+        padding: 0.6rem 1.2rem; 
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2);
     }
     .stButton>button:hover { 
-        background-color: #1d4ed8; 
-        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+        background: linear-gradient(135deg, #0369a1 100%, #0284c7 0%);
+        border-color: #38bdf8;
+        box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+        transform: translateY(-1px);
+    }
+
+    /* Inputs e Formulários */
+    .stTextInput>div>div>input, .stNumberInput>div>div>input, .stSelectbox>div>div>div {
+        background-color: #0f172a !important;
+        color: #f1f5f9 !important;
+        border-color: rgba(56, 189, 248, 0.2) !important;
+        border-radius: 8px !important;
     }
 
     /* Tabelas e Dataframes */
     .dataframe { 
-        border-radius: 8px; 
+        border-radius: 10px; 
         overflow: hidden; 
-        border: 1px solid #e2e8f0;
+        border: 1px solid rgba(56, 189, 248, 0.2);
+        background-color: #0b1120 !important;
     }
 
-    /* Alertas e Avisos */
+    /* Alertas Estilizados */
     .stAlert {
-        border-radius: 8px;
-        border: none;
+        border-radius: 10px;
+        background-color: #0f172a;
+        border: 1px solid rgba(255, 255, 255, 0.05);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -131,8 +149,8 @@ def tela_login():
     with col2:
         st.markdown("<br><br>", unsafe_allow_html=True)
         st.markdown("""
-            <div style="background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;">
-                <h2 style="text-align: center; color: #1e293b; margin-bottom: 20px;">🔐 Acesso Restrito</h2>
+            <div style="background: #0b1120; padding: 2.5rem; border-radius: 16px; box-shadow: 0 15px 35px rgba(0,0,0,0.6); border: 1px solid rgba(56, 189, 248, 0.3);">
+                <h2 style="text-align: center; color: #38bdf8; margin-bottom: 25px; font-weight: 800;">⚡ ACESSO RESTRITO</h2>
         """, unsafe_allow_html=True)
         with st.form("form_login"):
             usuario = st.text_input("Usuário")
@@ -156,19 +174,19 @@ if not st.session_state.autenticado:
 # BARRA LATERAL (SIDEBAR)
 # ==========================================
 with st.sidebar:
-    st.markdown("### 🏢 Painel de Controle")
-    st.write(f"Logado como: **Administrador**")
+    st.markdown("### ⚡ Painel Operacional")
+    st.write(f"Operador: **Administrador**")
     if st.button("🚪 Sair do Sistema", use_container_width=True):
         st.session_state.autenticado = False
         st.rerun()
     st.markdown("---")
-    st.success("🟢 Supabase Conectado")
+    st.success("🟢 Nuvem Sincronizada")
 
 # Cabeçalho Principal do Dashboard
 st.markdown("""
     <div class="title-container">
-        <p class="title-text">📊 Sistema ERP Integrado</p>
-        <p class="subtitle-text">Gestão centralizada de Estoque, Vendas, Financeiro e Fornecedores em tempo real</p>
+        <p class="title-text">⚡ CYBER ERP INTEGRATED SYSTEM</p>
+        <p class="subtitle-text">Monitoramento em Tempo Real • Estoque • Vendas • Financeiro • Fornecedores</p>
     </div>
 """, unsafe_allow_html=True)
 
