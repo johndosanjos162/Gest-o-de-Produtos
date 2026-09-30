@@ -101,6 +101,18 @@ with tab_estoque:
             st.info("Nenhum produto cadastrado para remover.")
 
     dados_est = st.session_state.estoque.copy()
+    
+    # === NOVO: SISTEMA DE ALERTA DE ESTOQUE ===
+    if not dados_est.empty:
+        # Filtra os produtos que estão com quantidade menor ou igual ao limite
+        produtos_em_alerta = dados_est[dados_est['Quantidade'] <= dados_est['Limite Mínimo']]
+        
+        if not produtos_em_alerta.empty:
+            st.warning("⚠️ **Atenção: Os seguintes produtos estão com estoque baixo!**")
+            for _, row in produtos_em_alerta.iterrows():
+                st.error(f"📉 **{row['Produto']}**: Restam apenas {row['Quantidade']} unidades (Limite: {row['Limite Mínimo']})")
+    
+    # === EXIBIÇÃO DA TABELA ===
     if not dados_est.empty:
         dados_est['Valor Total'] = dados_est['Quantidade'] * dados_est['Valor Unitário']
         st.subheader("Estoque Atual")
@@ -124,12 +136,10 @@ with tab_vendas:
                 estoque_atual = st.session_state.estoque.at[idx, 'Quantidade']
                 
                 if qtd_venda <= estoque_atual:
-                    # Dá baixa no estoque
                     st.session_state.estoque.at[idx, 'Quantidade'] = estoque_atual - qtd_venda
                     valor_unit = st.session_state.estoque.at[idx, 'Valor Unitário']
                     vlr_total = qtd_venda * valor_unit
                     
-                    # Registra a venda
                     nova_venda = pd.DataFrame({
                         'Data': [datetime.now().strftime("%Y-%m-%d %H:%M")],
                         'Produto': [prod_venda],
@@ -138,7 +148,6 @@ with tab_vendas:
                     })
                     st.session_state.vendas = pd.concat([st.session_state.vendas, nova_venda], ignore_index=True)
                     
-                    # Registra no financeiro como "Entrada"
                     novo_fin = pd.DataFrame({
                         'Data': [datetime.now().strftime("%Y-%m-%d %H:%M")],
                         'Descrição': [f"Venda: {prod_venda}"],
@@ -185,13 +194,11 @@ with tab_financeiro:
                 st.success("Transação registrada!")
                 st.rerun()
                 
-    # NOVA FUNÇÃO: Remover transação errada
     with st.expander("🗑️ Remover Transação (Corrigir Erro)"):
         if not st.session_state.financeiro.empty:
             df_fin = st.session_state.financeiro.copy()
             opcoes_exclusao = []
             
-            # Cria uma lista formatada para o usuário escolher o que apagar
             for i, row in df_fin.iterrows():
                 texto = f"ID: {i} | {row['Data']} | {row['Tipo']} | {row['Descrição']} | R$ {row['Valor']:.2f}"
                 opcoes_exclusao.append(texto)
@@ -199,7 +206,6 @@ with tab_financeiro:
             transacao_excluir = st.selectbox("Selecione a transação que deseja apagar:", opcoes_exclusao)
             
             if st.button("Apagar Registro Selecionado"):
-                # Extrai o ID numérico da string para apagar a linha correta
                 idx_excluir = int(transacao_excluir.split("|")[0].replace("ID:", "").strip())
                 st.session_state.financeiro = st.session_state.financeiro.drop(idx_excluir).reset_index(drop=True)
                 st.success("Transação apagada com sucesso!")
