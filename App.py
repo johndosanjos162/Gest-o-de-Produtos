@@ -9,7 +9,6 @@ from supabase import create_client, Client
 # ==========================================
 st.set_page_config(layout="wide", page_title="Sistema ERP Integrado", page_icon="📦")
 
-# CSS dinâmico adaptável
 st.markdown("""
 <style>
     .main { padding: 20px; }
@@ -108,13 +107,47 @@ df_pedidos_compra = carregar_dados_tabela("pedidos_compra")
 df_clientes = carregar_dados_tabela("clientes")
 df_caixa = carregar_dados_tabela("fechamento_caixa")
 
-# Normalizações para evitar quebras em tabelas vazias
+# ==========================================
+# NORMALIZAÇÃO DE COLUNAS (CORREÇÃO DE KEYERROR)
+# ==========================================
 if df_estoque.empty:
     df_estoque = pd.DataFrame(columns=['id', 'produto', 'categoria', 'quantidade', 'limite_minimo', 'valor_unitario', 'preco_custo'])
+else:
+    df_estoque = df_estoque.rename(columns={c: c.capitalize() for c in df_estoque.columns})
+    if 'Produto' not in df_estoque.columns and 'produto' in df_estoque.columns:
+        df_estoque = df_estoque.rename(columns={'produto': 'Produto'})
+    if 'Preço de custo' in df_estoque.columns:
+        df_estoque = df_estoque.rename(columns={'Preço de custo': 'Preço de Custo'})
+    if 'Valor unitario' in df_estoque.columns:
+        df_estoque = df_estoque.rename(columns={'Valor unitario': 'Valor Unitário'})
+
 if df_vendas.empty:
     df_vendas = pd.DataFrame(columns=['id', 'data', 'produto', 'quantidade', 'valor_total', 'lucro'])
+else:
+    # Normaliza mapeando colunas minúsculas para o padrão visual correto
+    col_map_vendas = {}
+    for col in df_vendas.columns:
+        c_lower = col.lower()
+        if c_lower == 'data': col_map_vendas[col] = 'Data'
+        elif c_lower == 'produto': col_map_vendas[col] = 'Produto'
+        elif c_lower == 'quantidade': col_map_vendas[col] = 'Quantidade'
+        elif c_lower in ['valor_total', 'valortotal']: col_map_vendas[col] = 'Valor Total'
+        elif c_lower == 'lucro': col_map_vendas[col] = 'Lucro'
+    df_vendas = df_vendas.rename(columns=col_map_vendas)
+
 if df_financeiro.empty:
     df_financeiro = pd.DataFrame(columns=['id', 'data', 'descricao', 'tipo', 'categoria', 'valor'])
+else:
+    col_map_fin = {}
+    for col in df_financeiro.columns:
+        c_lower = col.lower()
+        if c_lower == 'data': col_map_fin[col] = 'Data'
+        elif c_lower == 'descricao': col_map_fin[col] = 'Descrição'
+        elif c_lower == 'tipo': col_map_fin[col] = 'Tipo'
+        elif c_lower == 'categoria': col_map_fin[col] = 'Categoria'
+        elif c_lower == 'valor': col_map_fin[col] = 'Valor'
+    df_financeiro = df_financeiro.rename(columns=col_map_fin)
+
 if df_fornecedores.empty:
     df_fornecedores = pd.DataFrame(columns=['id', 'nome_empresa', 'cnpj', 'contato', 'telefone', 'email', 'observacoes'])
 if df_pedidos_compra.empty:
@@ -124,9 +157,7 @@ if df_clientes.empty:
 if df_caixa.empty:
     df_caixa = pd.DataFrame(columns=['id', 'data', 'tipo_registro', 'valor', 'responsavel', 'observacao'])
 
-# Padronizações visuais colunas
-if 'Produto' not in df_estoque.columns and 'produto' in df_estoque.columns:
-    df_estoque = df_estoque.rename(columns={'produto': 'Produto', 'categoria': 'Categoria', 'quantidade': 'Quantidade', 'limite_minimo': 'Limite Mínimo', 'valor_unitario': 'Valor Unitário', 'preco_custo': 'Preço de Custo'})
+# Garante colunas de custo padrão caso não existam
 if 'Preço de Custo' not in df_estoque.columns:
     df_estoque['Preço de Custo'] = 0.00
 
@@ -147,7 +178,7 @@ tab_estoque, tab_vendas, tab_despesas, tab_financeiro, tab_clientes, tab_fornece
 ])
 
 # ==========================================
-# 1. ESTOQUE (Com Cadastro, Edição e Exclusão)
+# 1. ESTOQUE
 # ==========================================
 with tab_estoque:
     st.subheader("📦 Gestão de Estoque")
@@ -177,7 +208,7 @@ with tab_estoque:
                     st.error(f"Erro: {e}")
 
     with sub_est_ger:
-        if not df_estoque.empty:
+        if not df_estoque.empty and 'Produto' in df_estoque.columns:
             prod_sel_ed = st.selectbox("Selecione o produto para Editar ou Excluir:", df_estoque['Produto'].tolist(), key="sel_ed_est")
             item_e = df_estoque[df_estoque['Produto'] == prod_sel_ed].iloc[0]
             
@@ -214,7 +245,7 @@ with tab_estoque:
             st.info("Nenhum produto no estoque.")
 
 # ==========================================
-# 2. VENDAS (Com Registro e Exclusão)
+# 2. VENDAS
 # ==========================================
 with tab_vendas:
     st.subheader("🛒 Registro e Gestão de Vendas")
@@ -222,7 +253,7 @@ with tab_vendas:
     
     with sub_v_reg:
         with st.form("form_venda"):
-            if not df_estoque.empty:
+            if not df_estoque.empty and 'Produto' in df_estoque.columns:
                 prod_venda = st.selectbox("Produto Vendido", df_estoque['Produto'].tolist())
                 qtd_venda = st.number_input("Quantidade", min_value=1, step=1)
                 
@@ -247,7 +278,7 @@ with tab_vendas:
                 st.warning("Cadastre produtos primeiro.")
 
     with sub_v_ger:
-        if not df_vendas.empty:
+        if not df_vendas.empty and 'Valor Total' in df_vendas.columns:
             st.dataframe(df_vendas[['id', 'Data', 'Produto', 'Quantidade', 'Valor Total', 'Lucro']].style.format({'Valor Total': 'R$ {:.2f}', 'Lucro': 'R$ {:.2f}'}), hide_index=True)
             st.markdown("---")
             v_id_del = st.selectbox("Selecione o ID da venda para excluir:", df_vendas['id'].tolist(), key="del_venda")
@@ -259,7 +290,7 @@ with tab_vendas:
             st.info("Nenhuma venda registrada.")
 
 # ==========================================
-# 3. DESPESAS (Com Cadastro e Exclusão)
+# 3. DESPESAS
 # ==========================================
 with tab_despesas:
     st.subheader("💡 Despesas do Comércio")
@@ -284,7 +315,7 @@ with tab_despesas:
                 st.rerun()
 
     with sub_d_ger:
-        df_despesas_apenas = df_financeiro[df_financeiro['Tipo'] == 'Saída'] if not df_financeiro.empty else pd.DataFrame()
+        df_despesas_apenas = df_financeiro[df_financeiro['Tipo'] == 'Saída'] if not df_financeiro.empty and 'Tipo' in df_financeiro.columns else pd.DataFrame()
         if not df_despesas_apenas.empty:
             st.dataframe(df_despesas_apenas[['id', 'Data', 'Categoria', 'Descrição', 'Valor']].style.format({'Valor': 'R$ {:.2f}'}), hide_index=True)
             st.markdown("---")
@@ -297,11 +328,11 @@ with tab_despesas:
             st.info("Nenhuma despesa lançada.")
 
 # ==========================================
-# 4. FINANCEIRO (Fluxo Geral)
+# 4. FINANCEIRO
 # ==========================================
 with tab_financeiro:
     st.subheader("💰 Fluxo de Caixa Completo")
-    if not df_financeiro.empty:
+    if not df_financeiro.empty and 'Tipo' in df_financeiro.columns:
         total_ent = df_financeiro[df_financeiro['Tipo'] == 'Entrada']['Valor'].sum()
         total_sai = df_financeiro[df_financeiro['Tipo'] == 'Saída']['Valor'].sum()
         c1, c2, c3 = st.columns(3)
@@ -313,7 +344,7 @@ with tab_financeiro:
         st.info("Nenhum registro financeiro.")
 
 # ==========================================
-# 5. GESTÃO DE CLIENTES (Com Cadastro, Edição e Exclusão)
+# 5. GESTÃO DE CLIENTES
 # ==========================================
 with tab_clientes:
     st.subheader("👥 Gestão de Clientes")
@@ -343,7 +374,7 @@ with tab_clientes:
                     st.error(f"Erro: {e}")
                     
     with sub_c_ger:
-        if not df_clientes.empty:
+        if not df_clientes.empty and 'nome' in df_clientes.columns:
             cli_sel_ed = st.selectbox("Selecione o cliente para Editar ou Excluir:", df_clientes['nome'].tolist(), key="sel_ed_cli")
             c_item = df_clientes[df_clientes['nome'] == cli_sel_ed].iloc[0]
             
@@ -378,7 +409,7 @@ with tab_clientes:
             st.info("Nenhum cliente cadastrado.")
 
 # ==========================================
-# 6. FORNECEDORES E COMPRAS (Com Edição e Exclusão)
+# 6. FORNECEDORES E COMPRAS
 # ==========================================
 with tab_fornecedores:
     st.subheader("🤝 Fornecedores e Pedidos de Compra")
@@ -401,12 +432,12 @@ with tab_fornecedores:
                 st.rerun()
 
     with sub_f_ped:
-        if not df_fornecedores.empty:
+        if not df_fornecedores.empty and 'nome_empresa' in df_fornecedores.columns:
             with st.form("form_ped"):
                 c1, c2 = st.columns(2)
                 with c1:
                     f_sel = st.selectbox("Fornecedor", df_fornecedores['nome_empresa'].tolist())
-                    p_sel = st.selectbox("Produto", df_estoque['Produto'].tolist()) if not df_estoque.empty else st.text_input("Produto")
+                    p_sel = st.selectbox("Produto", df_estoque['Produto'].tolist()) if not df_estoque.empty and 'Produto' in df_estoque.columns else st.text_input("Produto")
                     qtd_comp = st.number_input("Quantidade", min_value=1, step=1)
                 with c2:
                     custo_u = st.number_input("Custo Unitário (R$)", min_value=0.01, step=0.01)
@@ -420,7 +451,7 @@ with tab_fornecedores:
                     dt_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     supabase.table("pedidos_compra").insert({"data": dt_str, "fornecedor": f_sel, "produto": p_sel, "quantidade": int(qtd_comp), "preco_custo_unitario": float(custo_u), "valor_total": float(total_p), "status": st_ped}).execute()
                     
-                    if up_est_auto and not df_estoque.empty and p_sel in df_estoque['Produto'].values:
+                    if up_est_auto and not df_estoque.empty and 'Produto' in df_estoque.columns and p_sel in df_estoque['Produto'].values:
                         it = df_estoque[df_estoque['Produto'] == p_sel].iloc[0]
                         supabase.table("estoque").update({"quantidade": int(it['Quantidade']) + int(qtd_comp), "preco_custo": float(custo_u)}).eq("id", it['id']).execute()
                     
@@ -434,7 +465,7 @@ with tab_fornecedores:
 
     with sub_f_ger:
         st.write("### 🏢 Editar / Excluir Fornecedores")
-        if not df_fornecedores.empty:
+        if not df_fornecedores.empty and 'nome_empresa' in df_fornecedores.columns:
             forn_sel_ed = st.selectbox("Selecione o fornecedor:", df_fornecedores['nome_empresa'].tolist(), key="ed_forn_sel")
             f_item = df_fornecedores[df_fornecedores['nome_empresa'] == forn_sel_ed].iloc[0]
             
@@ -480,7 +511,7 @@ with tab_etiquetas:
     st.subheader("🏷️ Emissão de Etiquetas e Código de Barras")
     st.write("Selecione um produto do estoque para gerar etiquetas de gôndola formatadas para impressão rápida.")
     
-    if not df_estoque.empty:
+    if not df_estoque.empty and 'Produto' in df_estoque.columns:
         col_e1, col_e2 = st.columns(2)
         with col_e1:
             prod_etq = st.selectbox("Selecione o Produto", df_estoque['Produto'].tolist())
@@ -518,7 +549,7 @@ with tab_curva_abc:
     st.subheader("📊 Inteligência de Vendas & Relatório Curva ABC")
     st.write("Análise automatizada do faturamento por produto para classificar seu mix no padrão Curva ABC.")
     
-    if not df_vendas.empty:
+    if not df_vendas.empty and 'Produto' in df_vendas.columns and 'Valor Total' in df_vendas.columns:
         curva_df = df_vendas.groupby('Produto').agg(
             Quantidade_Vendida=('Quantidade', 'sum'),
             Faturamento_Total=('Valor Total', 'sum'),
@@ -568,7 +599,7 @@ with tab_curva_abc:
         st.info("Registre vendas no sistema para gerar a Inteligência de Vendas e Curva ABC.")
 
 # ==========================================
-# 9. FECHAMENTO DE CAIXA, SANGRIA E QUEBRA (Com Exclusão)
+# 9. FECHAMENTO DE CAIXA, SANGRIA E QUEBRA
 # ==========================================
 with tab_caixa:
     st.subheader("💵 Fechamento de Caixa Diário, Sangria e Quebra")
@@ -625,7 +656,7 @@ with tab_caixa:
 with tab_dashboard:
     st.subheader("📊 Dashboard Geral do Sistema")
     dados_fin_dash = df_financeiro.copy()
-    if not dados_fin_dash.empty:
+    if not dados_fin_dash.empty and 'Tipo' in dados_fin_dash.columns:
         ent = dados_fin_dash[dados_fin_dash['Tipo'] == 'Entrada']['Valor'].sum()
         sai = dados_fin_dash[dados_fin_dash['Tipo'] == 'Saída']['Valor'].sum()
         
