@@ -139,11 +139,12 @@ if 'Categoria' not in df_financeiro.columns:
     df_financeiro['Categoria'] = 'Geral'
 
 # ==========================================
-# ABAS PRINCIPAIS DO ERP (Substituído Fornecedores por Dashboard)
+# ABAS PRINCIPAIS DO ERP (Com Despesas do Comércio)
 # ==========================================
-tab_estoque, tab_vendas, tab_financeiro, tab_dashboard = st.tabs([
+tab_estoque, tab_vendas, tab_despesas, tab_financeiro, tab_dashboard = st.tabs([
     "📦 Estoque", 
     "🛒 Vendas", 
+    "💡 Despesas do Comércio",
     "💰 Controle Financeiro Total", 
     "📊 Dashboard & Gráficos"
 ])
@@ -407,7 +408,56 @@ with tab_vendas:
         st.info("Nenhuma venda registrada ainda.")
 
 # ==========================================
-# ABA 3: CONTROLE FINANCEIRO TOTAL
+# ABA 3: DESPESAS DO COMÉRCIO (Nova Função)
+# ==========================================
+with tab_despesas:
+    st.subheader("💡 Controle de Despesas Operacionais do Comércio")
+    st.write("Registre rapidamente contas como **Água, Energia/Luz, Internet, Aluguel** e outras despesas fixas ou variáveis do seu negócio.")
+    
+    with st.form("form_despesas_comercio"):
+        c1, c2 = st.columns(2)
+        with c1:
+            categoria_despesa = st.selectbox(
+                "Categoria da Despesa", 
+                ["Energia / Luz", "Água", "Internet / Telefone", "Aluguel", "Manutenção", "Impostos e Taxas", "Outros"]
+            )
+            descricao_despesa = st.text_input("Descrição / Referência (Ex: Conta de Luz - Mês Referência)")
+        with c2:
+            valor_despesa = st.number_input("Valor da Despesa (R$)", min_value=0.01, step=0.01)
+            data_despesa = st.date_input("Data do Vencimento / Pagamento", value=datetime.now())
+            
+        btn_salvar_despesa = st.form_submit_button("Lançar Despesa do Comércio", use_container_width=True)
+        
+        if btn_salvar_despesa and descricao_despesa:
+            try:
+                data_str = f"{data_despesa} {datetime.now().strftime('%H:%M:%S')}"
+                supabase.table("financeiro").insert({
+                    "data": data_str,
+                    "descricao": descricao_despesa.strip(),
+                    "tipo": "Saída",
+                    "categoria": f"Despesa: {categoria_despesa}",
+                    "valor": float(valor_despesa)
+                }).execute()
+                st.success(f"✅ Despesa de '{categoria_despesa}' lançada com sucesso no fluxo de caixa!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao registrar despesa: {e}")
+
+    st.markdown("---")
+    st.subheader("📋 Histórico de Despesas Registradas")
+    
+    dados_fin_gasto = df_financeiro.copy()
+    if not dados_fin_gasto.empty:
+        despesas_apenas = dados_fin_gasto[dados_fin_gasto['Tipo'] == 'Saída']
+        if not despesas_apenas.empty:
+            st.dataframe(despesas_apenas[['Data', 'Categoria', 'Descrição', 'Valor']].style.format({'Valor': 'R$ {:.2f}'}), hide_index=True)
+        else:
+            st.info("Nenhuma despesa cadastrada ainda.")
+    else:
+        st.info("Nenhum dado financeiro registrado.")
+
+# ==========================================
+# ABA 4: CONTROLE FINANCEIRO TOTAL
 # ==========================================
 with tab_financeiro:
     st.subheader("💰 Gestão Financeira Completa (Fluxo de Caixa)")
@@ -420,12 +470,12 @@ with tab_financeiro:
             c1, c2 = st.columns(2)
             with c1:
                 tipo = st.selectbox("Tipo de Movimentação", ["Entrada", "Saída"])
-                desc = st.text_input("Descrição / Histórico (Ex: Conta de Luz, Aluguel, Aporte)")
+                desc = st.text_input("Descrição / Histórico (Ex: Aporte, Venda Avulsa)")
             with c2:
                 if tipo == "Entrada":
                     cat_fin = st.selectbox("Categoria", ["Serviços Prestados", "Aporte de Capital", "Rendimentos / Juros", "Outras Entradas"])
                 else:
-                    cat_fin = st.selectbox("Categoria", ["Compra de Mercadoria / Estoque", "Despesas Operacionais (Água/Luz/Internet)", "Aluguel", "Salários / Pró-labore", "Impostos e Taxas", "Marketing e Publicidade", "Manutenção", "Outras Saídas"])
+                    cat_fin = st.selectbox("Categoria", ["Compra de Mercadoria / Estoque", "Despesas Operacionais", "Salários / Pró-labore", "Outras Saídas"])
                 valor = st.number_input("Valor (R$)", min_value=0.01, step=0.01)
                 
             data_lancamento = st.date_input("Data da Movimentação", value=datetime.now())
@@ -448,7 +498,7 @@ with tab_financeiro:
                     st.error(f"Erro ao salvar transação: {e}")
 
     with fin_tab_extrato:
-        st.write("### Histórico Unificado de Caixa (Vendas Automáticas + Manuais)")
+        st.write("### Histórico Unificado de Caixa (Vendas + Despesas + Manuais)")
         dados_fin = df_financeiro.copy()
         
         if not dados_fin.empty:
@@ -465,7 +515,7 @@ with tab_financeiro:
             st.dataframe(dados_fin[['id', 'Data', 'Tipo', 'Categoria', 'Descrição', 'Valor']].style.format({'Valor': 'R$ {:.2f}'}), hide_index=True)
             
             st.markdown("---")
-            st.write("#### Excluir Lançamento Manual")
+            st.write("#### Excluir Lançamento Financeiro")
             opcoes_exclusao = []
             for _, row in dados_fin.iterrows():
                 texto = f"ID: {row['id']} | {row['Data']} | [{row['Tipo']}] {row['Categoria']} - {row['Descrição']} | R$ {row['Valor']:.2f}"
@@ -513,7 +563,7 @@ with tab_financeiro:
             st.info("Cadastre movimentações financeiras para visualizar os relatórios.")
 
 # ==========================================
-# ABA 4: DASHBOARD & GRÁFICOS (Substitui Fornecedores)
+# ABA 5: DASHBOARD & GRÁFICOS
 # ==========================================
 with tab_dashboard:
     st.subheader("📊 Dashboard Analítico e Monitoramento do Comércio")
@@ -537,7 +587,6 @@ with tab_dashboard:
         
         with col_g1:
             st.write("### 🥧 Distribuição de Entradas e Saídas (Gráfico de Pizza)")
-            # Agrupamento por Tipo para o Gráfico de Pizza
             resumo_tipo = dados_fin_dash.groupby('Tipo')['Valor'].sum()
             if not resumo_tipo.empty:
                 st.altair_chart(
@@ -552,7 +601,7 @@ with tab_dashboard:
                 st.info("Dados insuficientes para o gráfico de pizza.")
 
         with col_g2:
-            st.write("### 🏷️ Gastos por Categoria (Despesas)")
+            st.write("### 🏷️ Despesas e Custos por Categoria")
             saidas_dash = dados_fin_dash[dados_fin_dash['Tipo'] == 'Saída']
             if not saidas_dash.empty:
                 resumo_cat = saidas_dash.groupby('Categoria')['Valor'].sum().reset_index()
