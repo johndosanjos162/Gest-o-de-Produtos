@@ -74,7 +74,7 @@ def tela_login():
             botao_login = st.form_submit_button("Entrar no Sistema", use_container_width=True)
             
             if botao_login:
-                if usuario == "JOHN" and senha == "fgxv4VP0":
+                if usuario == "admin" and senha == "admin123":
                     st.session_state.autenticado = True
                     st.success("Login realizado com sucesso!")
                     st.rerun()
@@ -106,23 +106,29 @@ def carregar_dados_tabela(nome_tabela):
         resposta = supabase.table(nome_tabela).select("*").execute()
         return pd.DataFrame(resposta.data)
     except Exception as e:
-        st.error(f"Erro ao carregar dados de {nome_tabela}: {e}")
+        # Se a tabela ainda não existir no banco, retorna um DataFrame vazio sem travar o sistema
         return pd.DataFrame()
 
 # Carregamento inicial dos dados da nuvem
 df_estoque = carregar_dados_tabela("estoque")
 df_vendas = carregar_dados_tabela("vendas")
 df_financeiro = carregar_dados_tabela("financeiro")
+df_fornecedores = carregar_dados_tabela("fornecedores")
+df_pedidos_compra = carregar_dados_tabela("pedidos_compra")
 
-# Normalização de colunas vazias
+# Normalização de colunas vazias para evitar quebras
 if df_estoque.empty:
     df_estoque = pd.DataFrame(columns=['id', 'produto', 'categoria', 'quantidade', 'limite_minimo', 'valor_unitario', 'preco_custo'])
 if df_vendas.empty:
     df_vendas = pd.DataFrame(columns=['id', 'data', 'produto', 'quantidade', 'valor_total', 'lucro'])
 if df_financeiro.empty:
     df_financeiro = pd.DataFrame(columns=['id', 'data', 'descricao', 'tipo', 'categoria', 'valor'])
+if df_fornecedores.empty:
+    df_fornecedores = pd.DataFrame(columns=['id', 'nome_empresa', 'cnpj', 'contato', 'telefone', 'email', 'observacoes'])
+if df_pedidos_compra.empty:
+    df_pedidos_compra = pd.DataFrame(columns=['id', 'data', 'fornecedor', 'produto', 'quantidade', 'preco_custo_unitario', 'valor_total', 'status'])
 
-# Padronização de nomes de colunas visualmente
+# Padronização de nomes de colunas visualmente para o Estoque
 if 'Produto' not in df_estoque.columns and 'produto' in df_estoque.columns:
     df_estoque = df_estoque.rename(columns={
         'produto': 'Produto',
@@ -161,13 +167,14 @@ if 'Categoria' not in df_financeiro.columns:
     df_financeiro['Categoria'] = 'Geral'
 
 # ==========================================
-# ABAS PRINCIPAIS DO ERP
+# ABAS PRINCIPAIS DO ERP (INCLUINDO A NOVA)
 # ==========================================
-tab_estoque, tab_vendas, tab_despesas, tab_financeiro, tab_dashboard = st.tabs([
+tab_estoque, tab_vendas, tab_despesas, tab_financeiro, tab_fornecedores, tab_dashboard = st.tabs([
     "📦 Estoque", 
     "🛒 Vendas", 
     "💡 Despesas do Comércio",
     "💰 Controle Financeiro Total", 
+    "🤝 Fornecedores e Compras",
     "📊 Dashboard & Gráficos"
 ])
 
@@ -637,7 +644,144 @@ with tab_financeiro:
             st.info("Cadastre movimentações financeiras para visualizar os relatórios.")
 
 # ==========================================
-# ABA 5: DASHBOARD & GRÁFICOS
+# ABA 5: FORNECEDORES E PEDIDOS DE COMPRA (NOVO MÓDULO)
+# ==========================================
+with tab_fornecedores:
+    st.subheader("🤝 Gestão de Fornecedores e Pedidos de Compra")
+    
+    sub_forn_cadastro, sub_forn_pedidos, sub_forn_lista = st.tabs([
+        "➕ Cadastrar Fornecedor", 
+        "📦 Registrar Pedido / Compra", 
+        "📋 Diretório e Histórico"
+    ])
+    
+    with sub_forn_cadastro:
+        st.write("### 🏢 Cadastro de Novo Fornecedor")
+        with st.form("form_cad_fornecedor"):
+            c1, c2 = st.columns(2)
+            with c1:
+                nome_empresa = st.text_input("Nome da Empresa / Fornecedor *")
+                cnpj = st.text_input("CNPJ")
+                contato = st.text_input("Nome do Representante / Vendedor")
+            with c2:
+                telefone = st.text_input("Telefone / WhatsApp")
+                email = st.text_input("E-mail")
+                observacoes = st.text_area("Observações (Ex: Condições de pagamento, dias de entrega)")
+                
+            btn_salvar_forn = st.form_submit_button("Salvar Fornecedor", use_container_width=True)
+            
+            if btn_salvar_forn and nome_empresa:
+                try:
+                    supabase.table("fornecedores").insert({
+                        "nome_empresa": nome_empresa.strip(),
+                        "cnpj": cnpj.strip(),
+                        "contato": contato.strip(),
+                        "telefone": telefone.strip(),
+                        "email": email.strip(),
+                        "observacoes": observacoes.strip()
+                    }).execute()
+                    st.success(f"✅ Fornecedor '{nome_empresa}' cadastrado com sucesso!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao salvar fornecedor: {e}")
+
+    with sub_forn_pedidos:
+        st.write("### 📦 Novo Pedido de Compra / Reposição")
+        st.write("Registre compras de mercadorias. Você pode optar por **atualizar automaticamente o estoque** e lançar a despesa no caixa.")
+        
+        if not df_fornecedores.empty:
+            lista_forn_nomes = df_fornecedores['nome_empresa'].tolist()
+            lista_est_produtos = df_estoque['Produto'].tolist() if not df_estoque.empty else []
+            
+            with st.form("form_novo_pedido"):
+                c1, c2 = st.columns(2)
+                with c1:
+                    forn_selecionado = st.selectbox("Selecione o Fornecedor", lista_forn_nomes)
+                    if lista_est_produtos:
+                        prod_compra = st.selectbox("Produto Comprado", lista_est_produtos)
+                    else:
+                        prod_compra = st.text_input("Nome do Produto Comprado")
+                    qtd_comprada = st.number_input("Quantidade Adquirida", min_value=1, step=1)
+                with c2:
+                    custo_unit_compra = st.number_input("Preço de Custo Unitário (R$)", min_value=0.01, step=0.01)
+                    data_compra = st.date_input("Data do Pedido", value=datetime.now())
+                    status_pedido = st.selectbox("Status da Compra", ["Entregue", "Pendente"])
+                
+                integrar_caixa = st.checkbox("Lançar valor total automaticamente como SAÍDA no Fluxo Financeiro?", value=True)
+                atualizar_est = st.checkbox("Adicionar quantidade comprada ao Estoque atual?", value=True)
+                
+                btn_salvar_pedido = st.form_submit_button("Registrar Pedido de Compra", use_container_width=True)
+                
+                if btn_salvar_pedido and prod_compra:
+                    try:
+                        vlr_total_compra = qtd_comprada * custo_unit_compra
+                        data_str = f"{data_compra} {datetime.now().strftime('%H:%M:%S')}"
+                        
+                        # 1. Salvar pedido na tabela de pedidos_compra
+                        supabase.table("pedidos_compra").insert({
+                            "data": data_str,
+                            "fornecedor": forn_selecionado,
+                            "produto": prod_compra,
+                            "quantidade": int(qtd_comprada),
+                            "preco_custo_unitario": float(custo_unit_compra),
+                            "valor_total": float(vlr_total_compra),
+                            "status": status_pedido
+                        }).execute()
+                        
+                        # 2. Atualizar estoque se marcado e se o produto já existir
+                        if atualizar_est and not df_estoque.empty and prod_compra in df_estoque['Produto'].values:
+                            item_e = df_estoque[df_estoque['Produto'] == prod_compra].iloc[0]
+                            novo_estoque_qtd = int(item_e['Quantidade']) + int(qtd_comprada)
+                            supabase.table("estoque").update({
+                                "quantidade": novo_estoque_qtd,
+                                "preco_custo": float(custo_unit_compra)
+                            }).eq("id", item_e['id']).execute()
+                        
+                        # 3. Lançar no financeiro se marcado
+                        if integrar_caixa:
+                            supabase.table("financeiro").insert({
+                                "data": data_str,
+                                "descricao": f"Compra estoque ({forn_selecionado}): {prod_compra} ({qtd_comprada} un)",
+                                "tipo": "Saída",
+                                "categoria": "Compra de Mercadoria / Estoque",
+                                "valor": float(vlr_total_compra)
+                            }).execute()
+                            
+                        st.success("✅ Pedido de compra registrado com sucesso!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao registrar pedido: {e}")
+        else:
+            st.info("Cadastre pelo menos um fornecedor na aba anterior antes de registrar pedidos de compra.")
+
+    with sub_forn_lista:
+        st.write("### 📋 Fornecedores Cadastrados")
+        if not df_fornecedores.empty:
+            st.dataframe(df_fornecedores[['nome_empresa', 'cnpj', 'contato', 'telefone', 'email', 'observacoes']], hide_index=True)
+            
+            st.markdown("---")
+            st.write("#### Excluir Fornecedor")
+            forn_para_apagar = st.selectbox("Selecione o fornecedor para remover:", df_fornecedores['nome_empresa'].tolist(), key="del_forn")
+            if st.button("🗑️ Remover Fornecedor Selecionado"):
+                try:
+                    f_id = df_fornecedores[df_fornecedores['nome_empresa'] == forn_para_apagar].iloc[0]['id']
+                    supabase.table("fornecedores").delete().eq("id", f_id).execute()
+                    st.success("Fornecedor removido com sucesso!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao excluir fornecedor: {e}")
+        else:
+            st.info("Nenhum fornecedor cadastrado ainda.")
+            
+        st.markdown("---")
+        st.write("### 📦 Histórico de Pedidos de Compra")
+        if not df_pedidos_compra.empty:
+            st.dataframe(df_pedidos_compra[['id', 'data', 'fornecedor', 'produto', 'quantidade', 'preco_custo_unitario', 'valor_total', 'status']].style.format({'preco_custo_unitario': 'R$ {:.2f}', 'valor_total': 'R$ {:.2f}'}), hide_index=True)
+        else:
+            st.info("Nenhum pedido de compra registrado.")
+
+# ==========================================
+# ABA 6: DASHBOARD & GRÁFICOS
 # ==========================================
 with tab_dashboard:
     st.subheader("📊 Dashboard Analítico e Monitoramento do Comércio")
