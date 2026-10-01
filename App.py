@@ -108,26 +108,28 @@ df_clientes = carregar_dados_tabela("clientes")
 df_caixa = carregar_dados_tabela("fechamento_caixa")
 
 # ==========================================
-# NORMALIZAÇÃO DE COLUNAS (CORREÇÃO DE KEYERROR)
+# NORMALIZAÇÃO ROBUSTA DE COLUNAS
 # ==========================================
 if df_estoque.empty:
-    df_estoque = pd.DataFrame(columns=['id', 'produto', 'categoria', 'quantidade', 'limite_minimo', 'valor_unitario', 'preco_custo'])
+    df_estoque = pd.DataFrame(columns=['id', 'Produto', 'Categoria', 'Quantidade', 'Limite Mínimo', 'Valor Unitário', 'Preço de Custo'])
 else:
-    df_estoque = df_estoque.rename(columns={c: c.capitalize() for c in df_estoque.columns})
-    if 'Produto' not in df_estoque.columns and 'produto' in df_estoque.columns:
-        df_estoque = df_estoque.rename(columns={'produto': 'Produto'})
-    if 'Preço de custo' in df_estoque.columns:
-        df_estoque = df_estoque.rename(columns={'Preço de custo': 'Preço de Custo'})
-    if 'Valor unitario' in df_estoque.columns:
-        df_estoque = df_estoque.rename(columns={'Valor unitario': 'Valor Unitário'})
+    col_map_est = {}
+    for col in df_estoque.columns:
+        c_lower = col.lower().strip()
+        if c_lower in ['produto', 'nome']: col_map_est[col] = 'Produto'
+        elif c_lower in ['categoria']: col_map_est[col] = 'Categoria'
+        elif c_lower in ['quantidade', 'qtd']: col_map_est[col] = 'Quantidade'
+        elif c_lower in ['limite_minimo', 'limiteminimo', 'limite']: col_map_est[col] = 'Limite Mínimo'
+        elif c_lower in ['valor_unitario', 'valorunitario', 'preco', 'valor']: col_map_est[col] = 'Valor Unitário'
+        elif c_lower in ['preco_custo', 'precocusto', 'custo']: col_map_est[col] = 'Preço de Custo'
+    df_estoque = df_estoque.rename(columns=col_map_est)
 
 if df_vendas.empty:
-    df_vendas = pd.DataFrame(columns=['id', 'data', 'produto', 'quantidade', 'valor_total', 'lucro'])
+    df_vendas = pd.DataFrame(columns=['id', 'Data', 'Produto', 'Quantidade', 'Valor Total', 'Lucro'])
 else:
-    # Normaliza mapeando colunas minúsculas para o padrão visual correto
     col_map_vendas = {}
     for col in df_vendas.columns:
-        c_lower = col.lower()
+        c_lower = col.lower().strip()
         if c_lower == 'data': col_map_vendas[col] = 'Data'
         elif c_lower == 'produto': col_map_vendas[col] = 'Produto'
         elif c_lower == 'quantidade': col_map_vendas[col] = 'Quantidade'
@@ -136,13 +138,13 @@ else:
     df_vendas = df_vendas.rename(columns=col_map_vendas)
 
 if df_financeiro.empty:
-    df_financeiro = pd.DataFrame(columns=['id', 'data', 'descricao', 'tipo', 'categoria', 'valor'])
+    df_financeiro = pd.DataFrame(columns=['id', 'Data', 'Tipo', 'Categoria', 'Descrição', 'Valor'])
 else:
     col_map_fin = {}
     for col in df_financeiro.columns:
-        c_lower = col.lower()
+        c_lower = col.lower().strip()
         if c_lower == 'data': col_map_fin[col] = 'Data'
-        elif c_lower == 'descricao': col_map_fin[col] = 'Descrição'
+        elif c_lower in ['descricao', 'descrição']: col_map_fin[col] = 'Descrição'
         elif c_lower == 'tipo': col_map_fin[col] = 'Tipo'
         elif c_lower == 'categoria': col_map_fin[col] = 'Categoria'
         elif c_lower == 'valor': col_map_fin[col] = 'Valor'
@@ -157,9 +159,17 @@ if df_clientes.empty:
 if df_caixa.empty:
     df_caixa = pd.DataFrame(columns=['id', 'data', 'tipo_registro', 'valor', 'responsavel', 'observacao'])
 
-# Garante colunas de custo padrão caso não existam
+# Garante colunas de apoio caso faltem
 if 'Preço de Custo' not in df_estoque.columns:
     df_estoque['Preço de Custo'] = 0.00
+if 'Limite Mínimo' not in df_estoque.columns:
+    df_estoque['Limite Mínimo'] = 0
+if 'Valor Unitário' not in df_estoque.columns:
+    df_estoque['Valor Unitário'] = 0.00
+if 'Categoria' not in df_estoque.columns:
+    df_estoque['Categoria'] = 'Geral'
+if 'Quantidade' not in df_estoque.columns:
+    df_estoque['Quantidade'] = 0
 
 # ==========================================
 # ABAS PRINCIPAIS DO ERP
@@ -171,7 +181,7 @@ tab_estoque, tab_vendas, tab_despesas, tab_financeiro, tab_clientes, tab_fornece
     "💰 Financeiro", 
     "👥 Clientes",
     "🤝 Fornecedores & Compras",
-    "🏷️ Etiquetas",
+    "🏷️️ Etiquetas",
     "📊 Curva ABC & Vendas",
     "💵 Caixa & Sangria",
     "📈 Dashboard"
@@ -388,7 +398,7 @@ with tab_clientes:
                 
                 col_cb1, col_cb2 = st.columns(2)
                 salvar_cli_ed = col_cb1.form_submit_button("💾 Salvar Alterações do Cliente")
-                excluir_cli = col_cb2.form_submit_button("🗑️️ Excluir Cliente")
+                excluir_cli = col_cb2.form_submit_button("🗑 Excluir Cliente")
                 
                 if salvar_cli_ed:
                     supabase.table("clientes").update({
@@ -522,7 +532,7 @@ with tab_etiquetas:
         cod_id = str(item_etq['id']).zfill(6)
         
         st.markdown("---")
-        st.write("### 🖨️ Pré-visualização da Etiqueta")
+        st.write("### 🖨️️ Pré-visualização da Etiqueta")
         
         cols_preview = st.columns(3)
         for i in range(min(3, qtd_etiquetas)):
