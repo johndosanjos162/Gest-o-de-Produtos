@@ -92,6 +92,46 @@ st.markdown("""
         border-radius: 8px !important;
     }
     
+    /* ============================================================
+       CAMPO DE VALOR RECEBIDO — GRANDE, DESTACADO E COM SOMBRA
+       ============================================================ */
+    .st-key-valor_cart input {
+        font-size: 2.6rem !important;
+        font-weight: 800 !important;
+        color: #4f46e5 !important;
+        text-align: center !important;
+        height: 110px !important;
+        min-height: 110px !important;
+        background: linear-gradient(135deg, #ffffff 0%, #eef2ff 100%) !important;
+        border: 3px solid #4f46e5 !important;
+        border-radius: 16px !important;
+        box-shadow: 
+            0 10px 25px rgba(79,70,229,0.30),
+            0 4px 10px rgba(0,0,0,0.08),
+            inset 0 3px 8px rgba(79,70,229,0.08) !important;
+        padding: 12px 20px !important;
+        letter-spacing: 1px !important;
+        transition: all 0.2s ease !important;
+    }
+    .st-key-valor_cart input:hover {
+        box-shadow: 
+            0 12px 30px rgba(79,70,229,0.40),
+            0 4px 10px rgba(0,0,0,0.10),
+            inset 0 3px 8px rgba(79,70,229,0.10) !important;
+    }
+    .st-key-valor_cart input:focus {
+        box-shadow: 
+            0 14px 35px rgba(79,70,229,0.50),
+            0 6px 14px rgba(0,0,0,0.12),
+            inset 0 3px 8px rgba(79,70,229,0.12) !important;
+        border-color: #4338ca !important;
+        outline: none !important;
+    }
+    .st-key-valor_cart label p {
+        font-size: 1.05rem !important;
+        font-weight: 700 !important;
+        color: #1e293b !important;
+    }
     /* ===== DataFrames ===== */
     .dataframe { border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
     
@@ -797,27 +837,36 @@ with tab_calculadora:
             st.markdown("---")
             st.markdown("#### 💵 Pagamento do Cliente")
 
-            cp1, cp2 = st.columns([1, 1])
+            # ============================================================
+            # CAMPOS DE PAGAMENTO — VALOR RECEBIDO (GRANDE) + TROCO (CARD)
+            # ============================================================
+            cp1, cp2 = st.columns([1.3, 1])
+
             with cp1:
                 valor_pago_carrinho = st.number_input(
-                    "Valor recebido (R$):", min_value=0.0, step=0.50,
-                    value=float(total_carrinho), key="valor_cart", format="%.2f"
+                    "💵 Valor recebido (R$):",
+                    min_value=0.0, step=0.50,
+                    value=float(total_carrinho),
+                    key="valor_cart",
+                    format="%.2f"
                 )
+
             with cp2:
                 troco_carrinho = round(valor_pago_carrinho - total_carrinho, 2)
+
                 if troco_carrinho >= 0:
                     st.markdown(f"""
-                    <div style="background: linear-gradient(135deg, #10b981, #059669); color:white; padding:1rem; border-radius:12px; text-align:center;">
-                        <p style="margin:0; font-size:0.85rem; opacity:0.9;">🪙 TROCO</p>
-                        <h2 style="margin:0.2rem 0;">{moeda(troco_carrinho)}</h2>
+                    <div style="background: linear-gradient(135deg, #10b981, #059669); color:white; padding:1.6rem 1rem; border-radius:16px; text-align:center; min-height: 145px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 10px 25px rgba(16,185,129,0.35), 0 4px 10px rgba(0,0,0,0.08);">
+                        <p style="margin:0; font-size:0.9rem; opacity:0.95; letter-spacing:1.5px; font-weight:600;">🪙 TROCO</p>
+                        <h1 style="margin:0.3rem 0; font-size:2.8rem; font-weight:800; letter-spacing:-0.5px;">{moeda(troco_carrinho)}</h1>
                     </div>
                     """, unsafe_allow_html=True)
                 else:
                     falta = abs(troco_carrinho)
                     st.markdown(f"""
-                    <div style="background: linear-gradient(135deg, #ef4444, #dc2626); color:white; padding:1rem; border-radius:12px; text-align:center;">
-                        <p style="margin:0; font-size:0.85rem; opacity:0.9;">⚠️ FALTA PAGAR</p>
-                        <h2 style="margin:0.2rem 0;">{moeda(falta)}</h2>
+                    <div style="background: linear-gradient(135deg, #ef4444, #dc2626); color:white; padding:1.6rem 1rem; border-radius:16px; text-align:center; min-height: 145px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 10px 25px rgba(239,68,68,0.35), 0 4px 10px rgba(0,0,0,0.08);">
+                        <p style="margin:0; font-size:0.9rem; opacity:0.95; letter-spacing:1.5px; font-weight:600;">⚠️ FALTA PAGAR</p>
+                        <h1 style="margin:0.3rem 0; font-size:2.8rem; font-weight:800; letter-spacing:-0.5px;">{moeda(falta)}</h1>
                     </div>
                     """, unsafe_allow_html=True)
 
