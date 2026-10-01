@@ -205,7 +205,7 @@ def tela_login():
             botao_login = st.form_submit_button("Entrar no Sistema", use_container_width=True)
             
             if botao_login:
-                if usuario == "JOHN" and senha == "fgxv4VP0/*":
+                if usuario == "JOHN" and senha == "fgxv4VP0":
                     st.session_state.autenticado = True
                     st.success("Login realizado com sucesso!")
                     st.rerun()
@@ -595,10 +595,11 @@ def gerar_relatorio_pdf():
 # ==========================================
 # ABAS PRINCIPAIS DO ERP
 # ==========================================
-tab_estoque, tab_planilhas_prod, tab_vendas, tab_despesas, tab_financeiro, tab_clientes, tab_fornecedores, tab_etiquetas, tab_curva_abc, tab_caixa, tab_dashboard, tab_relatorio = st.tabs([
+tab_estoque, tab_planilhas_prod, tab_vendas, tab_calculadora, tab_despesas, tab_financeiro, tab_clientes, tab_fornecedores, tab_etiquetas, tab_curva_abc, tab_caixa, tab_dashboard, tab_relatorio = st.tabs([
     "📦 Estoque", 
     "📑 Fichas por Produto",
     "🛒 Vendas", 
+    "🧮 Calculadora & Troco",
     "💡 Despesas",
     "💰 Financeiro", 
     "👥 Clientes",
@@ -828,6 +829,286 @@ with tab_vendas:
                 st.rerun()
         else:
             empty_state("🛒", "Nenhuma venda registrada", "Registre sua primeira venda na aba acima")
+
+# ==========================================
+# 3.5 CALCULADORA DE VENDA & TROCO
+# ==========================================
+with tab_calculadora:
+    secao("🧮 Calculadora de Venda & Troco", "Digite o dinheiro do cliente e veja o que ele pode comprar + troco")
+
+    if df_estoque.empty or 'Produto' not in df_estoque.columns:
+        empty_state("🧮", "Nenhum produto cadastrado", "Cadastre produtos no estoque primeiro")
+    else:
+        modo = st.radio(
+            "**Escolha o modo de cálculo:**",
+            ["🎯 Venda Direta (1 produto)", "🛒 Carrinho Multi-Itens"],
+            horizontal=True,
+            key="modo_calc"
+        )
+        st.markdown("---")
+
+        # ------------------------------------------
+        # MODO 1 — VENDA DIRETA (1 PRODUTO)
+        # ------------------------------------------
+        if modo == "🎯 Venda Direta (1 produto)":
+            col1, col2 = st.columns([1.2, 1])
+
+            with col1:
+                prod_calc = st.selectbox("Selecione o produto:", df_estoque['Produto'].tolist(), key="calc_prod")
+                item_calc = df_estoque[df_estoque['Produto'] == prod_calc].iloc[0]
+
+                preco_unit = float(item_calc['Valor Unitário'])
+                custo_unit = float(item_calc['Preço de Custo'])
+                estoque_disp = int(item_calc['Quantidade'])
+
+                st.markdown(f"""
+                <div style="background:#f8fafc; border-left:4px solid #4f46e5; padding:1rem 1.2rem; border-radius:8px; margin-top:1rem;">
+                    <p style="margin:0; color:#64748b; font-size:0.8rem; letter-spacing:0.5px;">📦 PRODUTO SELECIONADO</p>
+                    <h3 style="margin:0.3rem 0; color:#1e293b;">{prod_calc}</h3>
+                    <p style="margin:0.3rem 0; color:#475569;">💵 Preço de venda: <b style="color:#4f46e5;">{moeda(preco_unit)}</b> / unidade</p>
+                    <p style="margin:0.3rem 0; color:#475569;">📦 Estoque disponível: <b>{estoque_disp} un</b></p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col2:
+                st.markdown("##### 💵 Valor recebido do cliente")
+                valor_recebido = st.number_input(
+                    "Digite o valor em dinheiro (R$):",
+                    min_value=0.0, step=0.50, value=0.0,
+                    key="calc_valor", format="%.2f",
+                    label_visibility="collapsed"
+                )
+
+                # Botões rápidos de valores comuns
+                st.caption("Atalhos rápidos:")
+                atalhos_cols = st.columns(4)
+                valores_atalho = [10, 20, 50, 100]
+                for idx, v in enumerate(valores_atalho):
+                    if atalhos_cols[idx].button(f"R$ {v}", key=f"atalho_{v}", use_container_width=True):
+                        st.session_state.calc_valor = float(v)
+                        st.rerun()
+
+            st.markdown("---")
+
+            if valor_recebido > 0 and preco_unit > 0:
+                qtd_possivel = int(valor_recebido // preco_unit)
+                qtd_vender = min(qtd_possivel, estoque_disp)
+                valor_total_calc = qtd_vender * preco_unit
+                troco = round(valor_recebido - valor_total_calc, 2)
+
+                st.markdown("### 🧾 Resultado do Cálculo")
+
+                r1, r2, r3, r4 = st.columns(4)
+                r1.metric("🎯 Cabe no dinheiro", f"{qtd_possivel} un")
+                r2.metric("🛒 Será vendido", f"{qtd_vender} un",
+                          delta="estoque limitado" if qtd_possivel > estoque_disp else None,
+                          delta_color="inverse")
+                r3.metric("💰 Total da compra", moeda(valor_total_calc))
+                r4.metric("🪙 Troco", moeda(troco))
+
+                # Card gigante com troco
+                cor_troco = "#10b981" if troco >= 0 else "#ef4444"
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, {cor_troco}, #059669); color:white; padding:1.5rem; border-radius:14px; text-align:center; margin-top:1.5rem; box-shadow: 0 8px 20px rgba(16,185,129,0.25);">
+                    <p style="margin:0; font-size:0.9rem; opacity:0.9; letter-spacing:1px;">💰 TROCO A DEVOLVER</p>
+                    <h1 style="margin:0.3rem 0; font-size:3rem; font-weight:800;">{moeda(troco)}</h1>
+                    <p style="margin:0; opacity:0.95;">Cliente compra <b>{qtd_vender} unidade(s)</b> de <b>{prod_calc}</b></p>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Sugestão de composição do troco
+                if troco > 0:
+                    st.markdown("#### 💵 Sugestão de composição do troco")
+                    notas = [100, 50, 20, 10, 5, 2]
+                    moedas = [1, 0.50, 0.25, 0.10, 0.05, 0.01]
+                    restante = troco
+                    comp = []
+                    for n in notas:
+                        q = int(restante // n)
+                        if q > 0:
+                            comp.append(f"**{q}x** R$ {n},00")
+                            restante = round(restante - q * n, 2)
+                    for m in moedas:
+                        if restante <= 0:
+                            break
+                        q = int(round(restante / m, 2))
+                        if q > 0:
+                            comp.append(f"**{q}x** R$ {m:.2f}".replace(".", ","))
+                            restante = round(restante - q * m, 2)
+                    if comp:
+                        st.info("🔹 " + " + ".join(comp))
+
+                # Aviso de estoque insuficiente
+                if qtd_possivel > estoque_disp:
+                    st.warning(f"⚠️ Cliente poderia comprar **{qtd_possivel} un** com este valor, mas só há **{estoque_disp} un** em estoque.")
+
+                # Botão para registrar
+                st.markdown("---")
+                if qtd_vender > 0:
+                    if st.button("✅ Registrar Venda na Nuvem (Supabase)", type="primary", use_container_width=True, key="reg_venda_calc"):
+                        vlr_total_v = qtd_vender * preco_unit
+                        lucro_v = (preco_unit - custo_unit) * qtd_vender
+                        data_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                        supabase.table("estoque").update({"quantidade": estoque_disp - qtd_vender}).eq("id", int(item_calc['id'])).execute()
+                        supabase.table("vendas").insert({
+                            "data": data_str, "produto": prod_calc,
+                            "quantidade": int(qtd_vender),
+                            "valor_total": float(vlr_total_v), "lucro": float(lucro_v)
+                        }).execute()
+                        supabase.table("financeiro").insert({
+                            "data": data_str,
+                            "descricao": f"Venda (Calculadora): {prod_calc} ({qtd_vender} un)",
+                            "tipo": "Entrada", "categoria": "Vendas de Produtos",
+                            "valor": float(vlr_total_v)
+                        }).execute()
+
+                        st.success(f"✅ Venda registrada! Troco: **{moeda(troco)}** | Lucro: **{moeda(lucro_v)}**")
+                        st.balloons()
+                        st.rerun()
+                else:
+                    st.info("Nenhum item pode ser vendido com o valor informado.")
+            else:
+                st.info("💡 Informe um produto e um valor em dinheiro para ver o cálculo.")
+
+        # ------------------------------------------
+        # MODO 2 — CARRINHO MULTI-ITENS
+        # ------------------------------------------
+        else:
+            if 'carrinho' not in st.session_state:
+                st.session_state.carrinho = []
+
+            st.markdown("#### ➕ Adicionar produtos ao carrinho")
+            ca, cb, cc = st.columns([3, 1, 1])
+            with ca:
+                prod_add = st.selectbox("Produto:", df_estoque['Produto'].tolist(), key="cart_prod")
+            with cb:
+                qtd_add = st.number_input("Qtd:", min_value=1, value=1, step=1, key="cart_qtd")
+            with cc:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("➕ Adicionar", use_container_width=True):
+                    item_add = df_estoque[df_estoque['Produto'] == prod_add].iloc[0]
+                    ja_existe = next((x for x in st.session_state.carrinho if x['id'] == int(item_add['id'])), None)
+                    if ja_existe:
+                        ja_existe['quantidade'] += int(qtd_add)
+                    else:
+                        st.session_state.carrinho.append({
+                            'id': int(item_add['id']),
+                            'produto': prod_add,
+                            'preco': float(item_add['Valor Unitário']),
+                            'custo': float(item_add['Preço de Custo']),
+                            'quantidade': int(qtd_add),
+                            'estoque': int(item_add['Quantidade'])
+                        })
+                    st.toast(f"✅ {qtd_add}x {prod_add} adicionado!", icon="🛒")
+                    st.rerun()
+
+            st.markdown("---")
+
+            if st.session_state.carrinho:
+                st.markdown("#### 🛒 Itens no Carrinho")
+
+                df_carrinho = pd.DataFrame(st.session_state.carrinho)
+                df_carrinho['Subtotal'] = df_carrinho['preco'] * df_carrinho['quantidade']
+
+                st.dataframe(
+                    df_carrinho[['produto', 'quantidade', 'preco', 'Subtotal']].rename(columns={
+                        'produto': 'Produto', 'quantidade': 'Qtd',
+                        'preco': 'Preço Unit.', 'Subtotal': 'Subtotal'
+                    }).style.format({'Preço Unit.': 'R$ {:.2f}', 'Subtotal': 'R$ {:.2f}'}),
+                    hide_index=True, use_container_width=True
+                )
+
+                total_carrinho = df_carrinho['Subtotal'].sum()
+
+                cd1, cd2, cd3 = st.columns(3)
+                cd1.metric("🛍 Itens", f"{df_carrinho['quantidade'].sum()} un")
+                cd2.metric("💰 Total do Carrinho", moeda(total_carrinho))
+                with cd3:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button("🗑️ Limpar Carrinho", use_container_width=True):
+                        st.session_state.carrinho = []
+                        st.rerun()
+
+                st.markdown("---")
+                st.markdown("#### 💵 Pagamento do Cliente")
+
+                cp1, cp2 = st.columns([1, 1])
+                with cp1:
+                    valor_pago_carrinho = st.number_input(
+                        "Valor recebido (R$):", min_value=0.0, step=0.50,
+                        value=float(total_carrinho), key="valor_cart", format="%.2f"
+                    )
+                with cp2:
+                    troco_carrinho = round(valor_pago_carrinho - total_carrinho, 2)
+                    if troco_carrinho >= 0:
+                        st.markdown(f"""
+                        <div style="background: linear-gradient(135deg, #10b981, #059669); color:white; padding:1rem; border-radius:12px; text-align:center;">
+                            <p style="margin:0; font-size:0.85rem; opacity:0.9;">🪙 TROCO</p>
+                            <h2 style="margin:0.2rem 0;">{moeda(troco_carrinho)}</h2>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        falta = abs(troco_carrinho)
+                        st.markdown(f"""
+                        <div style="background: linear-gradient(135deg, #ef4444, #dc2626); color:white; padding:1rem; border-radius:12px; text-align:center;">
+                            <p style="margin:0; font-size:0.85rem; opacity:0.9;">⚠️ FALTA PAGAR</p>
+                            <h2 style="margin:0.2rem 0;">{moeda(falta)}</h2>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                # Verificar estoque
+                erros_estoque = [
+                    item for item in st.session_state.carrinho
+                    if item['quantidade'] > item['estoque']
+                ]
+                if erros_estoque:
+                    for it in erros_estoque:
+                        st.error(f"❌ Estoque insuficiente: **{it['produto']}** — disponível: {it['estoque']}, pedido: {it['quantidade']}")
+
+                st.markdown("---")
+                col_btn1, col_btn2 = st.columns([1, 1])
+                with col_btn1:
+                    if st.button("✅ Registrar Venda Completa", type="primary", use_container_width=True, disabled=bool(erros_estoque)):
+                        if valor_pago_carrinho < total_carrinho:
+                            st.error("⛔ Valor recebido menor que o total. Não é possível registrar.")
+                        else:
+                            try:
+                                data_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                for it in st.session_state.carrinho:
+                                    vlr_t = it['preco'] * it['quantidade']
+                                    lucro_v = (it['preco'] - it['custo']) * it['quantidade']
+
+                                    supabase.table("estoque").update({
+                                        "quantidade": it['estoque'] - it['quantidade']
+                                    }).eq("id", it['id']).execute()
+
+                                    supabase.table("vendas").insert({
+                                        "data": data_str, "produto": it['produto'],
+                                        "quantidade": int(it['quantidade']),
+                                        "valor_total": float(vlr_t), "lucro": float(lucro_v)
+                                    }).execute()
+
+                                    supabase.table("financeiro").insert({
+                                        "data": data_str,
+                                        "descricao": f"Venda (Carrinho): {it['produto']} ({it['quantidade']} un)",
+                                        "tipo": "Entrada", "categoria": "Vendas de Produtos",
+                                        "valor": float(vlr_t)
+                                    }).execute()
+
+                                troco_final = valor_pago_carrinho - total_carrinho
+                                st.success(f"✅ Venda de {len(st.session_state.carrinho)} item(ns) registrada! Troco: **{moeda(troco_final)}**")
+                                st.balloons()
+                                st.session_state.carrinho = []
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro ao registrar venda: {e}")
+                with col_btn2:
+                    if st.button("🧹 Cancelar e Limpar", use_container_width=True):
+                        st.session_state.carrinho = []
+                        st.rerun()
+            else:
+                empty_state("🛒", "Carrinho vazio", "Adicione produtos acima para começar a venda")
 
 # ==========================================
 # 4. DESPESAS
