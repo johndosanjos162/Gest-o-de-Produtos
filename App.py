@@ -91,7 +91,6 @@ def carregar_dados_tabela(nome_tabela):
 df_estoque = carregar_dados_tabela("estoque")
 df_vendas = carregar_dados_tabela("vendas")
 df_financeiro = carregar_dados_tabela("financeiro")
-df_fornecedores = carregar_dados_tabela("fornecedores")
 
 # Normalização de colunas vazias
 if df_estoque.empty:
@@ -100,8 +99,6 @@ if df_vendas.empty:
     df_vendas = pd.DataFrame(columns=['id', 'data', 'produto', 'quantidade', 'valor_total', 'lucro'])
 if df_financeiro.empty:
     df_financeiro = pd.DataFrame(columns=['id', 'data', 'descricao', 'tipo', 'categoria', 'valor'])
-if df_fornecedores.empty:
-    df_fornecedores = pd.DataFrame(columns=['id', 'nome', 'contato', 'categoria_produto'])
 
 # Padronização de nomes de colunas visualmente
 if 'Produto' not in df_estoque.columns and 'produto' in df_estoque.columns:
@@ -141,21 +138,14 @@ if 'Data' not in df_financeiro.columns and 'data' in df_financeiro.columns:
 if 'Categoria' not in df_financeiro.columns:
     df_financeiro['Categoria'] = 'Geral'
 
-if 'Nome' not in df_fornecedores.columns and 'nome' in df_fornecedores.columns:
-    df_fornecedores = df_fornecedores.rename(columns={
-        'nome': 'Nome',
-        'contato': 'Contato',
-        'categoria_produto': 'Categoria de Produto'
-    })
-
 # ==========================================
-# ABAS PRINCIPAIS DO ERP
+# ABAS PRINCIPAIS DO ERP (Substituído Fornecedores por Dashboard)
 # ==========================================
-tab_estoque, tab_vendas, tab_financeiro, tab_fornecedores = st.tabs([
+tab_estoque, tab_vendas, tab_financeiro, tab_dashboard = st.tabs([
     "📦 Estoque", 
     "🛒 Vendas", 
     "💰 Controle Financeiro Total", 
-    "🤝 Fornecedores"
+    "📊 Dashboard & Gráficos"
 ])
 
 # ==========================================
@@ -355,16 +345,13 @@ with tab_vendas:
                 
                 if btn_cancelar_venda:
                     try:
-                        # Estorna estoque
                         if not df_estoque.empty and old_prod in df_estoque['Produto'].values:
                             est_item = df_estoque[df_estoque['Produto'] == old_prod].iloc[0]
                             novo_qtd_est = int(est_item['Quantidade']) + old_qtd
                             supabase.table("estoque").update({"quantidade": novo_qtd_est}).eq("id", est_item['id']).execute()
                         
-                        # Remove venda
                         supabase.table("vendas").delete().eq("id", venda_atual['id']).execute()
                         
-                        # Remove lançamento financeiro automático correspondente
                         fin_match = df_financeiro[(df_financeiro['Descrição'].str.contains(old_prod)) & (df_financeiro['Valor'] == old_total)]
                         if not fin_match.empty:
                             supabase.table("financeiro").delete().eq("id", fin_match.iloc[0]['id']).execute()
@@ -397,7 +384,6 @@ with tab_vendas:
                                 "lucro": float(novo_lucro)
                             }).eq("id", venda_atual['id']).execute()
                             
-                            # Atualiza lançamento financeiro correspondente
                             fin_match = df_financeiro[(df_financeiro['Descrição'].str.contains(old_prod)) & (df_financeiro['Valor'] == old_total)]
                             if not fin_match.empty:
                                 supabase.table("financeiro").update({
@@ -527,30 +513,63 @@ with tab_financeiro:
             st.info("Cadastre movimentações financeiras para visualizar os relatórios.")
 
 # ==========================================
-# ABA 4: FORNECEDORES
+# ABA 4: DASHBOARD & GRÁFICOS (Substitui Fornecedores)
 # ==========================================
-with tab_fornecedores:
-    st.subheader("🤝 Cadastro de Fornecedores")
-    with st.expander("Adicionar Fornecedor"):
-        with st.form("form_forn"):
-            nome_forn = st.text_input("Nome do Fornecedor")
-            contato_forn = st.text_input("Contato (Telefone/Email)")
-            cat_forn = st.text_input("Categoria de Produtos Fornecidos")
-            btn_forn = st.form_submit_button("Cadastrar Fornecedor")
-            
-            if btn_forn and nome_forn:
-                try:
-                    supabase.table("fornecedores").insert({
-                        "nome": nome_forn.strip(),
-                        "contato": contato_forn,
-                        "categoria_produto": cat_forn
-                    }).execute()
-                    st.success("Fornecedor cadastrado com sucesso no Supabase!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro ao cadastrar fornecedor: {e}")
+with tab_dashboard:
+    st.subheader("📊 Dashboard Analítico e Monitoramento do Comércio")
+    
+    dados_fin_dash = df_financeiro.copy()
+    
+    if not dados_fin_dash.empty:
+        total_entradas_dash = dados_fin_dash[dados_fin_dash['Tipo'] == 'Entrada']['Valor'].sum()
+        total_saidas_dash = dados_fin_dash[dados_fin_dash['Tipo'] == 'Saída']['Valor'].sum()
+        resultado_liquido = total_entradas_dash - total_saidas_dash
+        
+        # Cartões de Resumo Executivo
+        col_m1, col_m2, col_m3 = st.columns(3)
+        col_m1.metric("🟢 Total de Ganhos (Entradas)", f"R$ {total_entradas_dash:.2f}")
+        col_m2.metric("🔴 Total de Perdas/Despesas", f"R$ {total_saidas_dash:.2f}")
+        col_m3.metric("💼 Resultado Líquido", f"R$ {resultado_liquido:.2f}", delta=f"R$ {resultado_liquido:.2f}")
+        
+        st.markdown("---")
+        
+        col_g1, col_g2 = st.columns(2)
+        
+        with col_g1:
+            st.write("### 🥧 Distribuição de Entradas e Saídas (Gráfico de Pizza)")
+            # Agrupamento por Tipo para o Gráfico de Pizza
+            resumo_tipo = dados_fin_dash.groupby('Tipo')['Valor'].sum()
+            if not resumo_tipo.empty:
+                st.altair_chart(
+                    __import__('altair').Chart(resumo_tipo.reset_index()).mark_arc(innerRadius=50).encode(
+                        theta=__import__('altair').Theta(field="Valor", type="quantitative"),
+                        color=__import__('altair').Color(field="Tipo", type="nominal", scale=__import__('altair').Scale(domain=['Entrada', 'Saída'], range=['#22c55e', '#ef4444'])),
+                        tooltip=['Tipo', 'Valor']
+                    ).properties(height=300),
+                    use_container_width=True
+                )
+            else:
+                st.info("Dados insuficientes para o gráfico de pizza.")
 
-    if not df_fornecedores.empty:
-        st.dataframe(df_fornecedores[['Nome', 'Contato', 'Categoria de Produto']], hide_index=True)
+        with col_g2:
+            st.write("### 🏷️ Gastos por Categoria (Despesas)")
+            saidas_dash = dados_fin_dash[dados_fin_dash['Tipo'] == 'Saída']
+            if not saidas_dash.empty:
+                resumo_cat = saidas_dash.groupby('Categoria')['Valor'].sum().reset_index()
+                st.altair_chart(
+                    __import__('altair').Chart(resumo_cat).mark_bar(color='#f97316').encode(
+                        x=__import__('altair').X('Categoria:N', sort='-y'),
+                        y=__import__('altair').Y('Valor:Q'),
+                        tooltip=['Categoria', 'Valor']
+                    ).properties(height=300),
+                    use_container_width=True
+                )
+            else:
+                st.info("Nenhuma despesa cadastrada para exibir o gráfico de categorias.")
+        
+        st.markdown("---")
+        st.write("### 📈 Histórico Geral de Transações Monitoradas")
+        st.dataframe(dados_fin_dash[['Data', 'Tipo', 'Categoria', 'Descrição', 'Valor']].style.format({'Valor': 'R$ {:.2f}'}), hide_index=True)
+        
     else:
-        st.info("Nenhum fornecedor cadastrado.")
+        st.info("Nenhum dado financeiro ou de vendas registrado ainda para gerar o dashboard analítico.")
