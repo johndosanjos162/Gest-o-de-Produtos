@@ -253,10 +253,7 @@ def carregar_dados_tabela(nome_tabela):
 df_estoque = carregar_dados_tabela("estoque")
 df_vendas = carregar_dados_tabela("vendas")
 df_financeiro = carregar_dados_tabela("financeiro")
-df_fornecedores = carregar_dados_tabela("fornecedores")
-df_pedidos_compra = carregar_dados_tabela("pedidos_compra")
 df_clientes = carregar_dados_tabela("clientes")
-df_caixa = carregar_dados_tabela("fechamento_caixa")
 
 # ==========================================
 # NORMALIZAÇÃO DE COLUNAS
@@ -301,14 +298,8 @@ else:
         elif c_lower == 'valor': col_map_fin[col] = 'Valor'
     df_financeiro = df_financeiro.rename(columns=col_map_fin)
 
-if df_fornecedores.empty:
-    df_fornecedores = pd.DataFrame(columns=['id', 'nome_empresa', 'cnpj', 'contato', 'telefone', 'email', 'observacoes'])
-if df_pedidos_compra.empty:
-    df_pedidos_compra = pd.DataFrame(columns=['id', 'data', 'fornecedor', 'produto', 'quantidade', 'preco_custo_unitario', 'valor_total', 'status'])
 if df_clientes.empty:
     df_clientes = pd.DataFrame(columns=['id', 'nome', 'cpf_cnpj', 'telefone', 'email', 'endereco', 'observacoes'])
-if df_caixa.empty:
-    df_caixa = pd.DataFrame(columns=['id', 'data', 'tipo_registro', 'valor', 'responsavel', 'observacao'])
 
 # Garante colunas de apoio
 if 'Preço de Custo' not in df_estoque.columns: df_estoque['Preço de Custo'] = 0.00
@@ -321,7 +312,7 @@ if 'Quantidade' not in df_estoque.columns: df_estoque['Quantidade'] = 0
 # FUNÇÃO DE GERAÇÃO DE RELATÓRIO PDF
 # ==========================================
 def gerar_relatorio_pdf():
-    """Gera um PDF completo com todas as seções do ERP integrado ao Supabase."""
+    """Gera um PDF com as seções ativas do ERP."""
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=landscape(A4),
@@ -500,93 +491,6 @@ def gerar_relatorio_pdf():
         elementos.append(t)
     else:
         elementos.append(Paragraph("Nenhum cliente cadastrado.", normal))
-    elementos.append(Spacer(1, 0.4 * cm))
-
-    # ---------- 5. FORNECEDORES ----------
-    elementos.append(Paragraph("5. Fornecedores", sub_style))
-    if not df_fornecedores.empty:
-        dados = [['Empresa', 'CNPJ', 'Contato', 'Telefone', 'E-mail']]
-        for _, row in df_fornecedores.iterrows():
-            dados.append([
-                str(row['nome_empresa'])[:30],
-                str(row['cnpj'] or ''),
-                str(row['contato'] or ''),
-                str(row['telefone'] or ''),
-                str(row['email'] or '')
-            ])
-        t = Table(dados, repeatRows=1)
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4f46e5')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 0.4, colors.grey),
-        ]))
-        elementos.append(t)
-    else:
-        elementos.append(Paragraph("Nenhum fornecedor cadastrado.", normal))
-    elementos.append(Spacer(1, 0.4 * cm))
-
-    # ---------- 6. PEDIDOS DE COMPRA ----------
-    elementos.append(Paragraph("6. Pedidos de Compra", sub_style))
-    if not df_pedidos_compra.empty:
-        dados = [['ID', 'Data', 'Fornecedor', 'Produto', 'Qtd',
-                  'Custo Unit. (R$)', 'Total (R$)', 'Status']]
-        for _, row in df_pedidos_compra.iterrows():
-            dados.append([
-                str(row['id']),
-                str(row['data'])[:19],
-                str(row['fornecedor'])[:25],
-                str(row['produto'])[:25],
-                str(int(row['quantidade'])),
-                f"{float(row['preco_custo_unitario']):.2f}",
-                f"{float(row['valor_total']):.2f}",
-                str(row['status'])
-            ])
-        total_ped = df_pedidos_compra['valor_total'].sum()
-        dados.append(['', '', '', 'TOTAL', '', '', f"R$ {total_ped:.2f}", ''])
-        t = Table(dados, repeatRows=1)
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4f46e5')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 0.4, colors.grey),
-            ('ALIGN', (4, 0), (-1, -1), 'RIGHT'),
-            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#e0e7ff')),
-            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-            ('SPAN', (0, -1), (3, -1)),
-        ]))
-        elementos.append(t)
-    else:
-        elementos.append(Paragraph("Nenhum pedido de compra registrado.", normal))
-    elementos.append(Spacer(1, 0.4 * cm))
-
-    # ---------- 7. FECHAMENTO DE CAIXA ----------
-    elementos.append(Paragraph("7. Fechamento de Caixa", sub_style))
-    if not df_caixa.empty:
-        dados = [['ID', 'Data', 'Tipo', 'Valor (R$)', 'Responsável', 'Observação']]
-        for _, row in df_caixa.iterrows():
-            dados.append([
-                str(row['id']),
-                str(row['data'])[:19],
-                str(row['tipo_registro']),
-                f"{float(row['valor']):.2f}",
-                str(row['responsavel'])[:25],
-                str(row['observacao'] or '')[:35]
-            ])
-        t = Table(dados, repeatRows=1)
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4f46e5')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 0.4, colors.grey),
-            ('ALIGN', (3, 0), (3, -1), 'RIGHT'),
-        ]))
-        elementos.append(t)
-    else:
-        elementos.append(Paragraph("Nenhuma operação de caixa registrada.", normal))
 
     doc.build(elementos)
     buffer.seek(0)
@@ -595,7 +499,7 @@ def gerar_relatorio_pdf():
 # ==========================================
 # ABAS PRINCIPAIS DO ERP
 # ==========================================
-tab_estoque, tab_planilhas_prod, tab_vendas, tab_calculadora, tab_despesas, tab_financeiro, tab_clientes, tab_fornecedores, tab_etiquetas, tab_curva_abc, tab_caixa, tab_dashboard, tab_relatorio = st.tabs([
+tab_estoque, tab_planilhas_prod, tab_vendas, tab_calculadora, tab_despesas, tab_financeiro, tab_clientes, tab_dashboard, tab_relatorio = st.tabs([
     "📦 Estoque", 
     "📑 Fichas por Produto",
     "🛒 Vendas", 
@@ -603,10 +507,6 @@ tab_estoque, tab_planilhas_prod, tab_vendas, tab_calculadora, tab_despesas, tab_
     "💡 Despesas",
     "💰 Financeiro", 
     "👥 Clientes",
-    "🤝 Fornecedores & Compras",
-    "🏷 Etiquetas",
-    "📊 Curva ABC & Vendas",
-    "💵 Caixa & Sangria",
     "📈 Dashboard",
     "📄 Relatório PDF"
 ])
@@ -1261,225 +1161,7 @@ with tab_clientes:
             empty_state("👥", "Nenhum cliente cadastrado", "Comece cadastrando seu primeiro cliente")
 
 # ==========================================
-# 7. FORNECEDORES E COMPRAS
-# ==========================================
-with tab_fornecedores:
-    secao("🤝 Fornecedores e Pedidos", "Gestão completa de parceiros e compras")
-    sub_f_cad, sub_f_ped, sub_f_ger = st.tabs(["➕ Novo Fornecedor", "📦 Registrar Pedido", "✏️ Gerenciar"])
-    
-    with sub_f_cad:
-        with st.form("form_forn"):
-            c1, c2 = st.columns(2)
-            with c1:
-                f_nome = st.text_input("Empresa *")
-                f_cnpj = st.text_input("CNPJ")
-                f_cont = st.text_input("Representante")
-            with c2:
-                f_tel = st.text_input("Telefone")
-                f_email = st.text_input("E-mail")
-                f_obs = st.text_area("Observações")
-            if st.form_submit_button("Salvar Fornecedor", use_container_width=True) and f_nome:
-                supabase.table("fornecedores").insert({"nome_empresa": f_nome, "cnpj": f_cnpj, "contato": f_cont, "telefone": f_tel, "email": f_email, "observacoes": f_obs}).execute()
-                st.success("Fornecedor salvo!")
-                st.rerun()
-
-    with sub_f_ped:
-        if not df_fornecedores.empty and 'nome_empresa' in df_fornecedores.columns:
-            with st.form("form_ped"):
-                c1, c2 = st.columns(2)
-                with c1:
-                    f_sel = st.selectbox("Fornecedor", df_fornecedores['nome_empresa'].tolist())
-                    p_sel = st.selectbox("Produto", df_estoque['Produto'].tolist()) if not df_estoque.empty and 'Produto' in df_estoque.columns else st.text_input("Produto")
-                    qtd_comp = st.number_input("Quantidade", min_value=1, step=1)
-                with c2:
-                    custo_u = st.number_input("Custo Unitário (R$)", min_value=0.01, step=0.01)
-                    st_ped = st.selectbox("Status", ["Pendente", "Entregue"])
-                
-                up_est_auto = st.checkbox("Atualizar Estoque Automaticamente?", value=True)
-                lanc_cx = st.checkbox("Lançar como Saída no Financeiro?", value=True)
-                
-                if st.form_submit_button("Registrar Pedido", use_container_width=True):
-                    total_p = qtd_comp * custo_u
-                    dt_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    supabase.table("pedidos_compra").insert({"data": dt_str, "fornecedor": f_sel, "produto": p_sel, "quantidade": int(qtd_comp), "preco_custo_unitario": float(custo_u), "valor_total": float(total_p), "status": st_ped}).execute()
-                    
-                    if up_est_auto and not df_estoque.empty and 'Produto' in df_estoque.columns and p_sel in df_estoque['Produto'].values:
-                        it = df_estoque[df_estoque['Produto'] == p_sel].iloc[0]
-                        supabase.table("estoque").update({"quantidade": int(it['Quantidade']) + int(qtd_comp), "preco_custo": float(custo_u)}).eq("id", it['id']).execute()
-                    
-                    if lanc_cx:
-                        supabase.table("financeiro").insert({"data": dt_str, "descricao": f"Compra ({f_sel}): {p_sel}", "tipo": "Saída", "categoria": "Compra de Mercadoria / Estoque", "valor": float(total_p)}).execute()
-                        
-                    st.success("Pedido registrado com sucesso!")
-                    st.rerun()
-        else:
-            st.info("Cadastre um fornecedor primeiro.")
-
-    with sub_f_ger:
-        st.write("### 🏢 Editar / Excluir Fornecedores")
-        if not df_fornecedores.empty and 'nome_empresa' in df_fornecedores.columns:
-            forn_sel_ed = st.selectbox("Selecione o fornecedor:", df_fornecedores['nome_empresa'].tolist(), key="ed_forn_sel")
-            f_item = df_fornecedores[df_fornecedores['nome_empresa'] == forn_sel_ed].iloc[0]
-            
-            with st.form("form_edit_forn"):
-                ef_nome = st.text_input("Empresa", value=str(f_item['nome_empresa']))
-                ef_cnpj = st.text_input("CNPJ", value=str(f_item['cnpj']) if f_item['cnpj'] else "")
-                ef_cont = st.text_input("Representante", value=str(f_item['contato']) if f_item['contato'] else "")
-                ef_tel = st.text_input("Telefone", value=str(f_item['telefone']) if f_item['telefone'] else "")
-                ef_email = st.text_input("E-mail", value=str(f_item['email']) if f_item['email'] else "")
-                ef_obs = st.text_area("Observações", value=str(f_item['observacoes']) if f_item['observacoes'] else "")
-                
-                col_fb1, col_fb2 = st.columns(2)
-                if col_fb1.form_submit_button("💾 Salvar Fornecedor", use_container_width=True):
-                    supabase.table("fornecedores").update({
-                        "nome_empresa": ef_nome, "cnpj": ef_cnpj, "contato": ef_cont, "telefone": ef_tel, "email": ef_email, "observacoes": ef_obs
-                    }).eq("id", int(f_item['id'])).execute()
-                    st.success("Fornecedor atualizado!")
-                    st.rerun()
-                    
-                if col_fb2.form_submit_button("🗑️ Excluir Fornecedor", use_container_width=True):
-                    supabase.table("fornecedores").delete().eq("id", int(f_item['id'])).execute()
-                    st.success("Fornecedor excluído!")
-                    st.rerun()
-        else:
-            st.info("Nenhum fornecedor cadastrado.")
-            
-        st.markdown("---")
-        st.write("### 📦 Histórico de Pedidos de Compra")
-        if not df_pedidos_compra.empty:
-            st.dataframe(df_pedidos_compra.style.format({'preco_custo_unitario': 'R$ {:.2f}', 'valor_total': 'R$ {:.2f}'}), hide_index=True, use_container_width=True)
-            lista_ids_ped = [str(x) for x in df_pedidos_compra['id'].tolist()]
-            id_ped_del_str = st.selectbox("Selecione o ID do pedido para excluir:", lista_ids_ped, key="del_ped")
-            if st.button("Excluir Pedido de Compra", use_container_width=True):
-                supabase.table("pedidos_compra").delete().eq("id", int(id_ped_del_str)).execute()
-                st.success("Pedido excluído!")
-                st.rerun()
-        else:
-            st.info("Nenhum pedido registrado.")
-
-# ==========================================
-# 8. ETIQUETAS
-# ==========================================
-with tab_etiquetas:
-    secao("🏷️ Emissão de Etiquetas", "Geração de código de barras e preço para produtos")
-    if not df_estoque.empty and 'Produto' in df_estoque.columns:
-        col_e1, col_e2 = st.columns(2)
-        with col_e1:
-            prod_etq = st.selectbox("Selecione o Produto", df_estoque['Produto'].tolist())
-            qtd_etiquetas = st.number_input("Quantidade de Etiquetas", min_value=1, max_value=100, value=10)
-        
-        item_etq = df_estoque[df_estoque['Produto'] == prod_etq].iloc[0]
-        preco_etq = item_etq['Valor Unitário']
-        cod_id = str(item_etq['id']).zfill(6)
-        
-        st.markdown("---")
-        cols_preview = st.columns(3)
-        for i in range(min(3, qtd_etiquetas)):
-            with cols_preview[i]:
-                st.markdown(f"""
-                <div style="border: 2px dashed #4f46e5; padding: 15px; border-radius: 10px; text-align: center; background-color: #fff; color: #000; box-shadow: 0 2px 6px rgba(79,70,229,0.1);">
-                    <h4 style="margin:0; font-size: 16px; color:#1e293b;">{prod_etq}</h4>
-                    <p style="font-size: 12px; margin: 5px 0; color:#64748b;">Cód: 789000{cod_id}</p>
-                    <h3 style="margin:0; color: #10b981;">R$ {preco_etq:.2f}</h3>
-                    <p style="font-size: 20px; font-family: monospace; letter-spacing: 2px; margin: 5px 0;">||| | |||| || |</p>
-                </div>
-                """, unsafe_allow_html=True)
-    else:
-        empty_state("🏷️", "Sem produtos cadastrados", "Cadastre produtos para gerar etiquetas")
-
-# ==========================================
-# 9. CURVA ABC
-# ==========================================
-with tab_curva_abc:
-    secao("📊 Curva ABC & Inteligência de Vendas", "Classificação de produtos por representatividade no faturamento")
-    if not df_vendas.empty and 'Produto' in df_vendas.columns and 'Valor Total' in df_vendas.columns:
-        curva_df = df_vendas.groupby('Produto').agg(
-            Quantidade_Vendida=('Quantidade', 'sum'),
-            Faturamento_Total=('Valor Total', 'sum'),
-            Lucro_Total=('Lucro', 'sum')
-        ).reset_index().sort_values(by='Faturamento_Total', ascending=False)
-        
-        faturamento_geral = curva_df['Faturamento_Total'].sum()
-        if faturamento_geral > 0:
-            curva_df['Participacao_%'] = (curva_df['Faturamento_Total'] / faturamento_geral) * 100
-            curva_df['Acumulado_%'] = curva_df['Participacao_%'].cumsum()
-            
-            def classificar_abc(acum):
-                if acum <= 80: return 'A'
-                elif acum <= 95: return 'B'
-                else: return 'C'
-                    
-            curva_df['Curva ABC'] = curva_df['Acumulado_%'].apply(classificar_abc)
-            
-            # Gráfico Curva ABC
-            chart_abc = alt.Chart(curva_df).mark_bar(
-                cornerRadiusTopLeft=6, cornerRadiusTopRight=6
-            ).encode(
-                x=alt.X('Produto:N', sort='-y', title='', axis=alt.Axis(labelAngle=-45)),
-                y=alt.Y('Faturamento_Total:Q', title='Faturamento (R$)'),
-                color=alt.Color('Curva ABC:N', scale=alt.Scale(
-                    domain=['A', 'B', 'C'],
-                    range=['#10b981', '#f59e0b', '#ef4444']),
-                    legend=alt.Legend(title='Classe')
-                ),
-                tooltip=['Produto', 
-                         alt.Tooltip('Faturamento_Total:Q', format=',.2f'),
-                         alt.Tooltip('Participacao_%:Q', format='.2f')]
-            ).properties(height=350, title='📊 Distribuição da Curva ABC')
-            st.altair_chart(tema_altair(chart_abc), use_container_width=True)
-            
-            st.dataframe(curva_df.style.format({
-                'Faturamento_Total': 'R$ {:.2f}',
-                'Lucro_Total': 'R$ {:.2f}',
-                'Participacao_%': '{:.2f}%',
-                'Acumulado_%': '{:.2f}%'
-            }), hide_index=True, use_container_width=True)
-        else:
-            st.info("Faturamento zerado.")
-    else:
-        empty_state("📊", "Nenhuma venda registrada", "A Curva ABC será exibida após as primeiras vendas")
-
-# ==========================================
-# 10. CAIXA & SANGRIA
-# ==========================================
-with tab_caixa:
-    secao("💵 Fechamento de Caixa", "Abertura, sangria e apuração diária")
-    sub_cx_lanc, sub_cx_ger = st.tabs(["➕ Operações de Caixa", "📋 Histórico e Exclusão"])
-    
-    with sub_cx_lanc:
-        with st.form("form_operacao_caixa"):
-            c1, c2 = st.columns(2)
-            with c1:
-                tipo_op = st.selectbox("Tipo de Operação", ["Abertura de Caixa", "Sangria (Retirada de Dinheiro)", "Fechamento de Caixa com Apuração"])
-                resp = st.text_input("Operador / Responsável", value="Caixa Principal")
-            with c2:
-                vlr_op = st.number_input("Valor Envolvido (R$)", min_value=0.0, step=0.01)
-                data_op = st.date_input("Data da Operação", value=datetime.now())
-                
-            obs_op = st.text_area("Observações")
-            if st.form_submit_button("Registrar Operação", use_container_width=True):
-                dt_str = f"{data_op} {datetime.now().strftime('%H:%M:%S')}"
-                db_tipo = "Abertura" if "Abertura" in tipo_op else ("Sangria" if "Sangria" in tipo_op else "Fechamento")
-                supabase.table("fechamento_caixa").insert({"data": dt_str, "tipo_registro": db_tipo, "valor": float(vlr_op), "responsavel": resp, "observacao": obs_op}).execute()
-                if db_tipo == "Sangria":
-                    supabase.table("financeiro").insert({"data": dt_str, "descricao": f"Sangria ({resp}): {obs_op}", "tipo": "Saída", "categoria": "Despesas Operacionais", "valor": float(vlr_op)}).execute()
-                st.success("Operação registrada!")
-                st.rerun()
-
-    with sub_cx_ger:
-        if not df_caixa.empty:
-            st.dataframe(df_caixa.style.format({'valor': 'R$ {:.2f}'}), hide_index=True, use_container_width=True)
-            lista_ids_cx = [str(x) for x in df_caixa['id'].tolist()]
-            cx_del_str = st.selectbox("ID do registro para excluir:", lista_ids_cx, key="del_cx_reg")
-            if st.button("Excluir Registro de Caixa", use_container_width=True):
-                supabase.table("fechamento_caixa").delete().eq("id", int(cx_del_str)).execute()
-                st.success("Excluído com sucesso!")
-                st.rerun()
-        else:
-            empty_state("💵", "Nenhuma operação registrada", "Registre a abertura ou fechamento do caixa")
-
-# ==========================================
-# 11. DASHBOARD GERAL
+# 7. DASHBOARD GERAL
 # ==========================================
 with tab_dashboard:
     secao("📈 Painel Gerencial", "Visão consolidada do negócio em tempo real")
@@ -1564,12 +1246,12 @@ with tab_dashboard:
                         legend=alt.Legend(title='Classe ABC')
                     ),
                     tooltip=['Classe', alt.Tooltip('Valor Total:Q', format=',.2f')]
-                ).properties(height=280, title='📊 Curva ABC')
+                ).properties(height=280, title='📊 Distribuição de Vendas')
                 st.altair_chart(tema_altair(chart), use_container_width=True)
             else:
-                st.info("Sem dados para Curva ABC.")
+                st.info("Sem dados para distribuição.")
         else:
-            st.info("Registre vendas para ver a Curva ABC.")
+            st.info("Registre vendas para ver a distribuição.")
     
     with col_d:
         if not df_financeiro.empty and 'Tipo' in df_financeiro.columns:
@@ -1590,13 +1272,13 @@ with tab_dashboard:
             st.info("Sem dados financeiros.")
 
 # ==========================================
-# 12. RELATÓRIO PDF INTEGRADO
+# 8. RELATÓRIO PDF INTEGRADO
 # ==========================================
 with tab_relatorio:
     secao("📄 Relatório Geral em PDF", "Documento completo extraído em tempo real do Supabase")
     st.write(
-        "Gere um relatório completo com **todas as informações do sistema** "
-        "(Estoque, Vendas, Financeiro, Clientes, Fornecedores, Pedidos de Compra e Caixa)."
+        "Gere um relatório completo com **as informações do sistema** "
+        "(Estoque, Vendas, Financeiro e Clientes)."
     )
 
     st.info(
@@ -1619,10 +1301,7 @@ with tab_relatorio:
                 df_estoque = carregar_dados_tabela("estoque")
                 df_vendas = carregar_dados_tabela("vendas")
                 df_financeiro = carregar_dados_tabela("financeiro")
-                df_fornecedores = carregar_dados_tabela("fornecedores")
-                df_pedidos_compra = carregar_dados_tabela("pedidos_compra")
                 df_clientes = carregar_dados_tabela("clientes")
-                df_caixa = carregar_dados_tabela("fechamento_caixa")
 
                 # Normalização mínima
                 if df_estoque.empty:
@@ -1666,9 +1345,6 @@ with tab_relatorio:
                         elif c_lower == 'categoria': col_map_fin[col] = 'Categoria'
                         elif c_lower == 'valor': col_map_fin[col] = 'Valor'
                     df_financeiro = df_financeiro.rename(columns=col_map_fin)
-
-                if df_pedidos_compra.empty:
-                    df_pedidos_compra = pd.DataFrame(columns=['id', 'data', 'fornecedor', 'produto', 'quantidade', 'preco_custo_unitario', 'valor_total', 'status'])
 
                 pdf_bytes = gerar_relatorio_pdf()
 
