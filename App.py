@@ -94,7 +94,11 @@ st.markdown('<p class="title-text">📦 Sistema ERP Integrado (Nuvem)</p>', unsa
 def carregar_dados_tabela(nome_tabela):
     try:
         resposta = supabase.table(nome_tabela).select("*").execute()
-        return pd.DataFrame(resposta.data)
+        df = pd.DataFrame(resposta.data)
+        # Garante que colunas 'id' sejam inteiras se existirem
+        if not df.empty and 'id' in df.columns:
+            df['id'] = pd.to_numeric(df['id'], errors='coerce').fillna(0).astype(int)
+        return df
     except Exception as e:
         return pd.DataFrame()
 
@@ -181,7 +185,7 @@ tab_estoque, tab_vendas, tab_despesas, tab_financeiro, tab_clientes, tab_fornece
     "💰 Financeiro", 
     "👥 Clientes",
     "🤝 Fornecedores & Compras",
-    "🏷️️ Etiquetas",
+    "🏷 Etiquetas",
     "📊 Curva ABC & Vendas",
     "💵 Caixa & Sangria",
     "📈 Dashboard"
@@ -291,9 +295,11 @@ with tab_vendas:
         if not df_vendas.empty and 'Valor Total' in df_vendas.columns:
             st.dataframe(df_vendas[['id', 'Data', 'Produto', 'Quantidade', 'Valor Total', 'Lucro']].style.format({'Valor Total': 'R$ {:.2f}', 'Lucro': 'R$ {:.2f}'}), hide_index=True)
             st.markdown("---")
-            v_id_del = st.selectbox("Selecione o ID da venda para excluir:", df_vendas['id'].tolist(), key="del_venda")
+            # Usando formatador string para evitar que o selectbox formate o ID com pontos (ex: 1.000)
+            lista_ids_vendas = [str(x) for x in df_vendas['id'].tolist()]
+            v_id_del_str = st.selectbox("Selecione o ID da venda para excluir:", lista_ids_vendas, key="del_venda")
             if st.button("Excluir Venda Selecionada"):
-                supabase.table("vendas").delete().eq("id", int(v_id_del)).execute()
+                supabase.table("vendas").delete().eq("id", int(v_id_del_str)).execute()
                 st.success("Venda excluída com sucesso!")
                 st.rerun()
         else:
@@ -329,9 +335,10 @@ with tab_despesas:
         if not df_despesas_apenas.empty:
             st.dataframe(df_despesas_apenas[['id', 'Data', 'Categoria', 'Descrição', 'Valor']].style.format({'Valor': 'R$ {:.2f}'}), hide_index=True)
             st.markdown("---")
-            id_desp_del = st.selectbox("Selecione o ID da despesa para excluir:", df_despesas_apenas['id'].tolist(), key="del_desp")
+            lista_ids_desp = [str(x) for x in df_despesas_apenas['id'].tolist()]
+            id_desp_del_str = st.selectbox("Selecione o ID da despesa para excluir:", lista_ids_desp, key="del_desp")
             if st.button("Excluir Despesa"):
-                supabase.table("financeiro").delete().eq("id", int(id_desp_del)).execute()
+                supabase.table("financeiro").delete().eq("id", int(id_desp_del_str)).execute()
                 st.success("Despesa excluída!")
                 st.rerun()
         else:
@@ -506,9 +513,10 @@ with tab_fornecedores:
         st.write("### 📦 Histórico de Pedidos de Compra (Exclusão)")
         if not df_pedidos_compra.empty:
             st.dataframe(df_pedidos_compra.style.format({'preco_custo_unitario': 'R$ {:.2f}', 'valor_total': 'R$ {:.2f}'}), hide_index=True)
-            id_ped_del = st.selectbox("Selecione o ID do pedido para excluir:", df_pedidos_compra['id'].tolist(), key="del_ped")
+            lista_ids_ped = [str(x) for x in df_pedidos_compra['id'].tolist()]
+            id_ped_del_str = st.selectbox("Selecione o ID do pedido para excluir:", lista_ids_ped, key="del_ped")
             if st.button("Excluir Pedido de Compra"):
-                supabase.table("pedidos_compra").delete().eq("id", int(id_ped_del)).execute()
+                supabase.table("pedidos_compra").delete().eq("id", int(id_ped_del_str)).execute()
                 st.success("Pedido excluído!")
                 st.rerun()
         else:
@@ -532,7 +540,7 @@ with tab_etiquetas:
         cod_id = str(item_etq['id']).zfill(6)
         
         st.markdown("---")
-        st.write("### 🖨️️ Pré-visualização da Etiqueta")
+        st.write("### 🖨 Pré-visualização da Etiqueta")
         
         cols_preview = st.columns(3)
         for i in range(min(3, qtd_etiquetas)):
@@ -652,9 +660,10 @@ with tab_caixa:
         if not df_caixa.empty:
             st.dataframe(df_caixa.style.format({'valor': 'R$ {:.2f}'}), hide_index=True)
             st.markdown("---")
-            cx_del = st.selectbox("Selecione o ID do registro de caixa para excluir:", df_caixa['id'].tolist(), key="del_cx_reg")
+            lista_ids_cx = [str(x) for x in df_caixa['id'].tolist()]
+            cx_del_str = st.selectbox("Selecione o ID do registro de caixa para excluir:", lista_ids_cx, key="del_cx_reg")
             if st.button("Excluir Registro de Caixa"):
-                supabase.table("fechamento_caixa").delete().eq("id", int(cx_del)).execute()
+                supabase.table("fechamento_caixa").delete().eq("id", int(cx_del_str)).execute()
                 st.success("Registro de caixa excluído!")
                 st.rerun()
         else:
