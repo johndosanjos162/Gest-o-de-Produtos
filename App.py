@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import altair as alt
 from datetime import datetime
 from supabase import create_client, Client
 
@@ -662,9 +663,9 @@ with tab_dashboard:
             resumo_tipo = dados_fin_dash.groupby('Tipo')['Valor'].sum()
             if not resumo_tipo.empty:
                 st.altair_chart(
-                    __import__('altair').Chart(resumo_tipo.reset_index()).mark_arc(innerRadius=50).encode(
-                        theta=__import__('altair'].Theta(field="Valor", type="quantitative"),
-                        color=__import__('altair').Color(field="Tipo", type="nominal", scale=__import__('altair').Scale(domain=['Entrada', 'Saída'], range=['#22c55e', '#ef4444'])),
+                    alt.Chart(resumo_tipo.reset_index()).mark_arc(innerRadius=50).encode(
+                        theta=alt.Theta(field="Valor", type="quantitative"),
+                        color=alt.Color(field="Tipo", type="nominal", scale=alt.Scale(domain=['Entrada', 'Saída'], range=['#22c55e', '#ef4444'])),
                         tooltip=['Tipo', 'Valor']
                     ).properties(height=300),
                     use_container_width=True
@@ -678,9 +679,9 @@ with tab_dashboard:
             if not saidas_dash.empty:
                 resumo_cat = saidas_dash.groupby('Categoria')['Valor'].sum().reset_index()
                 st.altair_chart(
-                    __import__('altair').Chart(resumo_cat).mark_bar(color='#f97316').encode(
-                        x=__import__('altair').X('Categoria:N', sort='-y'),
-                        y=__import__('altair').Y('Valor:Q'),
+                    alt.Chart(resumo_cat).mark_bar(color='#f97316').encode(
+                        x=alt.X('Categoria:N', sort='-y'),
+                        y=alt.Y('Valor:Q'),
                         tooltip=['Categoria', 'Valor']
                     ).properties(height=300),
                     use_container_width=True
