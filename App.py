@@ -8,14 +8,35 @@ from supabase import create_client, Client
 # ==========================================
 st.set_page_config(layout="wide", page_title="Sistema ERP Integrado", page_icon="📦")
 
+# CSS dinâmico adaptável para Modo Claro e Modo Escuro nativo do Streamlit
 st.markdown("""
 <style>
-    /* Estilização Geral */
-    .main { background-color: #f5f7fb; padding: 20px; }
-    .title-text { color: #1f2937; font-weight: 700; font-size: 2.2rem; margin-bottom: 20px; text-align: center; }
-    .stExpander, .stTabs { border: 1px solid #e0e4e8; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); background-color: #ffffff; margin-bottom: 15px; padding: 10px; }
-    .stButton>button { background-color: #4f46e5; color: white; border-radius: 6px; font-weight: 600; border: none; padding: 10px 20px; transition: background-color 0.2s; }
-    .stButton>button:hover { background-color: #4338ca; }
+    /* Estilização Geral Adaptável */
+    .main { padding: 20px; }
+    .title-text { font-weight: 700; font-size: 2.2rem; margin-bottom: 20px; text-align: center; }
+    
+    /* Ajuste para Expander e Abas manterem legibilidade em ambos os temas */
+    .stExpander, .stTabs { 
+        border-radius: 8px; 
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
+        margin-bottom: 15px; 
+        padding: 10px; 
+    }
+    
+    /* Botões principais mantêm destaque consistente */
+    .stButton>button { 
+        background-color: #4f46e5; 
+        color: white; 
+        border-radius: 6px; 
+        font-weight: 600; 
+        border: none; 
+        padding: 10px 20px; 
+        transition: background-color 0.2s; 
+    }
+    .stButton>button:hover { 
+        background-color: #4338ca; 
+    }
+    
     .dataframe { border-radius: 8px; overflow: hidden; }
 </style>
 """, unsafe_allow_html=True)
@@ -402,13 +423,12 @@ with tab_vendas:
         st.info("Nenhuma venda registrada ainda.")
 
 # ==========================================
-# ABA 3: DESPESAS DO COMÉRCIO (Com Opções de Excluir e Editar)
+# ABA 3: DESPESAS DO COMÉRCIO
 # ==========================================
 with tab_despesas:
     st.subheader("💡 Controle de Despesas Operacionais do Comércio")
     st.write("Registre rapidamente contas como **Água, Energia/Luz, Internet, Aluguel** e gerencie os lançamentos incorretos.")
     
-    # Sub-abas para Organizar: Novo Lançamento | Gerenciar/Editar/Excluir
     sub_aba_cadastro, sub_aba_gerenciar = st.tabs(["➕ Nova Despesa", "✏️ Gerenciar, Editar ou Excluir Despesas"])
     
     with sub_aba_cadastro:
@@ -449,7 +469,6 @@ with tab_despesas:
             despesas_apenas = dados_fin_gasto[dados_fin_gasto['Tipo'] == 'Saída'].copy()
             
             if not despesas_apenas.empty:
-                # Filtrar apenas as categorias que começam com "Despesa:" para focar nas despesas do comércio
                 despesas_comercio = despesas_apenas[despesas_apenas['Categoria'].str.startswith('Despesa:')].copy()
                 
                 if not despesas_comercio.empty:
@@ -468,7 +487,6 @@ with tab_despesas:
                     
                     item_despesa_atual = despesas_comercio[despesas_comercio['id'].astype(str) == id_selecionado].iloc[0]
                     
-                    # Extrair nome puro da categoria sem o prefixo "Despesa: "
                     cat_atual_limpa = item_despesa_atual['Categoria'].replace("Despesa: ", "").strip()
                     categorias_possiveis = ["Energia / Luz", "Água", "Internet / Telefone", "Aluguel", "Manutenção", "Impostos e Taxas", "Outros"]
                     idx_cat = categorias_possiveis.index(cat_atual_limpa) if cat_atual_limpa in categorias_possiveis else 0
@@ -645,7 +663,7 @@ with tab_dashboard:
             if not resumo_tipo.empty:
                 st.altair_chart(
                     __import__('altair').Chart(resumo_tipo.reset_index()).mark_arc(innerRadius=50).encode(
-                        theta=__import__('altair').Theta(field="Valor", type="quantitative"),
+                        theta=__import__('altair'].Theta(field="Valor", type="quantitative"),
                         color=__import__('altair').Color(field="Tipo", type="nominal", scale=__import__('altair').Scale(domain=['Entrada', 'Saída'], range=['#22c55e', '#ef4444'])),
                         tooltip=['Tipo', 'Valor']
                     ).properties(height=300),
