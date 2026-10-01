@@ -170,7 +170,7 @@ if 'Categoria' not in df_estoque.columns: df_estoque['Categoria'] = 'Geral'
 if 'Quantidade' not in df_estoque.columns: df_estoque['Quantidade'] = 0
 
 # ==========================================
-# ABAS PRINCIPAIS DO ERP (Com a nova aba de fichas por produto)
+# ABAS PRINCIPAIS DO ERP
 # ==========================================
 tab_estoque, tab_planilhas_prod, tab_vendas, tab_despesas, tab_financeiro, tab_clientes, tab_fornecedores, tab_etiquetas, tab_curva_abc, tab_caixa, tab_dashboard = st.tabs([
     "📦 Estoque", 
@@ -275,7 +275,6 @@ with tab_planilhas_prod:
     if not df_estoque.empty and 'Produto' in df_estoque.columns:
         produto_escolhido = st.selectbox("Escolha o produto para ver a ficha detalhada:", df_estoque['Produto'].tolist(), key="sel_ficha_prod")
         
-        # Filtra os dados do produto selecionado
         p_info = df_estoque[df_estoque['Produto'] == produto_escolhido].iloc[0]
         
         qtd_atual = int(p_info['Quantidade'])
@@ -285,7 +284,6 @@ with tab_planilhas_prod:
         st.markdown("---")
         st.markdown(f"### 📋 Ficha Técnica: **{produto_escolhido}** ({p_info['Categoria']})")
         
-        # Bloco de edição rápida do preço de venda específico para este produto
         with st.form(f"form_ficha_{p_info['id']}"):
             col_f1, col_f2, col_f3 = st.columns(3)
             with col_f1:
@@ -301,7 +299,6 @@ with tab_planilhas_prod:
                 st.success(f"Preço de revenda de '{produto_escolhido}' atualizado com sucesso!")
                 st.rerun()
                 
-        # Cálculos de projeção para o produto selecionado
         custo_total_prod = qtd_atual * preco_mercado
         faturamento_total_prod = qtd_atual * novo_preco_revenda if 'novo_preco_revenda' in locals() else qtd_atual * preco_revenda_atual
         lucro_total_prod = faturamento_total_prod - custo_total_prod
@@ -317,7 +314,6 @@ with tab_planilhas_prod:
         st.markdown("---")
         st.markdown("#### 📊 Tabela de Simulação de Venda em Lote")
         
-        # Cria uma mini-tabela simuladora de lotes (ex: 1 un até 50 un)
         simulacao_dados = []
         for q in [1, 5, 10, 20, 50, 100, qtd_atual if qtd_atual > 0 else 1]:
             if q <= qtd_atual or q == [1, 5, 10, 20, 50, 100, qtd_atual if qtd_atual > 0 else 1][-1]:
@@ -755,7 +751,7 @@ with tab_dashboard:
     st.subheader("📈 Dashboard Geral do Sistema")
     if not df_financeiro.empty and 'Tipo' in df_financeiro.columns:
         ent = df_financeiro[df_financeiro['Tipo'] == 'Entrada']['Valor'].sum()
-        sai = df_financeiro[df_financeior['Tipo'] == 'Saída']['Valor'].sum() if 'df_financeiro' in locals() else 0
+        sai = df_financeiro[df_financeiro['Tipo'] == 'Saída']['Valor'].sum() if 'df_financeiro' in locals() else 0
         c1, c2, c3 = st.columns(3)
         c1.metric("Entradas Totais", f"R$ {ent:.2f}")
         c2.metric("Saídas Totais", f"R$ {sai:.2f}")
