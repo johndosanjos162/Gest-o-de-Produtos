@@ -139,7 +139,7 @@ if 'Categoria' not in df_financeiro.columns:
     df_financeiro['Categoria'] = 'Geral'
 
 # ==========================================
-# ABAS PRINCIPAIS DO ERP (Com Despesas do Comércio)
+# ABAS PRINCIPAIS DO ERP
 # ==========================================
 tab_estoque, tab_vendas, tab_despesas, tab_financeiro, tab_dashboard = st.tabs([
     "📦 Estoque", 
@@ -286,10 +286,7 @@ with tab_vendas:
                     data_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     
                     try:
-                        # 1. Atualiza estoque
                         supabase.table("estoque").update({"quantidade": novo_estoque}).eq("id", item_id).execute()
-                        
-                        # 2. Registra venda com lucro
                         supabase.table("vendas").insert({
                             "data": data_str,
                             "produto": prod_venda,
@@ -297,8 +294,6 @@ with tab_vendas:
                             "valor_total": float(vlr_total),
                             "lucro": float(lucro_venda)
                         }).execute()
-                        
-                        # 3. Lançamento Automático no Financeiro (Entrada)
                         supabase.table("financeiro").insert({
                             "data": data_str,
                             "descricao": f"Venda automática: {prod_venda} ({qtd_venda} un)",
@@ -377,7 +372,6 @@ with tab_vendas:
                             novo_lucro = (float(est_new['Valor Unitário']) - float(est_new['Preço de Custo'])) * nova_qtd
                             
                             supabase.table("estoque").update({"quantidade": novo_estoque_val}).eq("id", est_new['id']).execute()
-                            
                             supabase.table("vendas").update({
                                 "produto": novo_prod,
                                 "quantidade": int(nova_qtd),
@@ -408,53 +402,114 @@ with tab_vendas:
         st.info("Nenhuma venda registrada ainda.")
 
 # ==========================================
-# ABA 3: DESPESAS DO COMÉRCIO (Nova Função)
+# ABA 3: DESPESAS DO COMÉRCIO (Com Opções de Excluir e Editar)
 # ==========================================
 with tab_despesas:
     st.subheader("💡 Controle de Despesas Operacionais do Comércio")
-    st.write("Registre rapidamente contas como **Água, Energia/Luz, Internet, Aluguel** e outras despesas fixas ou variáveis do seu negócio.")
+    st.write("Registre rapidamente contas como **Água, Energia/Luz, Internet, Aluguel** e gerencie os lançamentos incorretos.")
     
-    with st.form("form_despesas_comercio"):
-        c1, c2 = st.columns(2)
-        with c1:
-            categoria_despesa = st.selectbox(
-                "Categoria da Despesa", 
-                ["Energia / Luz", "Água", "Internet / Telefone", "Aluguel", "Manutenção", "Impostos e Taxas", "Outros"]
-            )
-            descricao_despesa = st.text_input("Descrição / Referência (Ex: Conta de Luz - Mês Referência)")
-        with c2:
-            valor_despesa = st.number_input("Valor da Despesa (R$)", min_value=0.01, step=0.01)
-            data_despesa = st.date_input("Data do Vencimento / Pagamento", value=datetime.now())
+    # Sub-abas para Organizar: Novo Lançamento | Gerenciar/Editar/Excluir
+    sub_aba_cadastro, sub_aba_gerenciar = st.tabs(["➕ Nova Despesa", "✏️ Gerenciar, Editar ou Excluir Despesas"])
+    
+    with sub_aba_cadastro:
+        with st.form("form_despesas_comercio"):
+            c1, c2 = st.columns(2)
+            with c1:
+                categoria_despesa = st.selectbox(
+                    "Categoria da Despesa", 
+                    ["Energia / Luz", "Água", "Internet / Telefone", "Aluguel", "Manutenção", "Impostos e Taxas", "Outros"]
+                )
+                descricao_despesa = st.text_input("Descrição / Referência (Ex: Conta de Luz - Mês Referência)")
+            with c2:
+                valor_despesa = st.number_input("Valor da Despesa (R$)", min_value=0.01, step=0.01)
+                data_despesa = st.date_input("Data do Vencimento / Pagamento", value=datetime.now())
+                
+            btn_salvar_despesa = st.form_submit_button("Lançar Despesa do Comércio", use_container_width=True)
             
-        btn_salvar_despesa = st.form_submit_button("Lançar Despesa do Comércio", use_container_width=True)
-        
-        if btn_salvar_despesa and descricao_despesa:
-            try:
-                data_str = f"{data_despesa} {datetime.now().strftime('%H:%M:%S')}"
-                supabase.table("financeiro").insert({
-                    "data": data_str,
-                    "descricao": descricao_despesa.strip(),
-                    "tipo": "Saída",
-                    "categoria": f"Despesa: {categoria_despesa}",
-                    "valor": float(valor_despesa)
-                }).execute()
-                st.success(f"✅ Despesa de '{categoria_despesa}' lançada com sucesso no fluxo de caixa!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Erro ao registrar despesa: {e}")
+            if btn_salvar_despesa and descricao_despesa:
+                try:
+                    data_str = f"{data_despesa} {datetime.now().strftime('%H:%M:%S')}"
+                    supabase.table("financeiro").insert({
+                        "data": data_str,
+                        "descricao": descricao_despesa.strip(),
+                        "tipo": "Saída",
+                        "categoria": f"Despesa: {categoria_despesa}",
+                        "valor": float(valor_despesa)
+                    }).execute()
+                    st.success(f"✅ Despesa de '{categoria_despesa}' lançada com sucesso no fluxo de caixa!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao registrar despesa: {e}")
 
-    st.markdown("---")
-    st.subheader("📋 Histórico de Despesas Registradas")
-    
-    dados_fin_gasto = df_financeiro.copy()
-    if not dados_fin_gasto.empty:
-        despesas_apenas = dados_fin_gasto[dados_fin_gasto['Tipo'] == 'Saída']
-        if not despesas_apenas.empty:
-            st.dataframe(despesas_apenas[['Data', 'Categoria', 'Descrição', 'Valor']].style.format({'Valor': 'R$ {:.2f}'}), hide_index=True)
+    with sub_aba_gerenciar:
+        st.write("### 📋 Histórico e Gestão de Despesas Cadastradas")
+        dados_fin_gasto = df_financeiro.copy()
+        
+        if not dados_fin_gasto.empty:
+            despesas_apenas = dados_fin_gasto[dados_fin_gasto['Tipo'] == 'Saída'].copy()
+            
+            if not despesas_apenas.empty:
+                # Filtrar apenas as categorias que começam com "Despesa:" para focar nas despesas do comércio
+                despesas_comercio = despesas_apenas[despesas_apenas['Categoria'].str.startswith('Despesa:')].copy()
+                
+                if not despesas_comercio.empty:
+                    st.dataframe(despesas_comercio[['id', 'Data', 'Categoria', 'Descrição', 'Valor']].style.format({'Valor': 'R$ {:.2f}'}), hide_index=True)
+                    
+                    st.markdown("---")
+                    st.write("#### 🛠️ Escolha uma Despesa para Excluir ou Editar")
+                    
+                    opcoes_despesas = []
+                    for _, row in despesas_comercio.iterrows():
+                        texto_op = f"ID: {row['id']} | {row['Data']} | {row['Categoria']} - {row['Descrição']} | R$ {row['Valor']:.2f}"
+                        opcoes_despesas.append(texto_op)
+                        
+                    despesa_selecionada = st.selectbox("Selecione o registro da despesa:", opcoes_despesas)
+                    id_selecionado = despesa_selecionada.split("|")[0].replace("ID:", "").strip()
+                    
+                    item_despesa_atual = despesas_comercio[despesas_comercio['id'].astype(str) == id_selecionado].iloc[0]
+                    
+                    # Extrair nome puro da categoria sem o prefixo "Despesa: "
+                    cat_atual_limpa = item_despesa_atual['Categoria'].replace("Despesa: ", "").strip()
+                    categorias_possiveis = ["Energia / Luz", "Água", "Internet / Telefone", "Aluguel", "Manutenção", "Impostos e Taxas", "Outros"]
+                    idx_cat = categorias_possiveis.index(cat_atual_limpa) if cat_atual_limpa in categorias_possiveis else 0
+                    
+                    col_b1, col_b2 = st.columns(2)
+                    
+                    with col_b1:
+                        if st.button("🗑️ Excluir Despesa Selecionada", use_container_width=True):
+                            try:
+                                supabase.table("financeiro").delete().eq("id", id_selecionado).execute()
+                                st.success("Despesa excluída com sucesso!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro ao excluir despesa: {e}")
+                                
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    with st.form("form_editar_despesa"):
+                        st.write("#### ✏️ Modificar Dados da Despesa")
+                        nova_cat = st.selectbox("Nova Categoria", categorias_possiveis, index=idx_cat)
+                        nova_desc = st.text_input("Nova Descrição", value=item_despesa_atual['Descrição'])
+                        novo_vlr = st.number_input("Novo Valor (R$)", value=float(item_despesa_atual['Valor']), min_value=0.01, step=0.01)
+                        
+                        btn_salvar_edicao = st.form_submit_button("💾 Salvar Alterações da Despesa", use_container_width=True)
+                        
+                        if btn_salvar_edicao:
+                            try:
+                                supabase.table("financeiro").update({
+                                    "descricao": nova_desc.strip(),
+                                    "categoria": f"Despesa: {nova_cat}",
+                                    "valor": float(novo_vlr)
+                                }).eq("id", id_selecionado).execute()
+                                st.success("Despesa atualizada com sucesso!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro ao atualizar despesa: {e}")
+                else:
+                    st.info("Nenhuma despesa do comércio cadastrada ainda.")
+            else:
+                st.info("Nenhuma saída registrada no sistema.")
         else:
-            st.info("Nenhuma despesa cadastrada ainda.")
-    else:
-        st.info("Nenhum dado financeiro registrado.")
+            st.info("Nenhum dado financeiro registrado.")
 
 # ==========================================
 # ABA 4: CONTROLE FINANCEIRO TOTAL
@@ -575,7 +630,6 @@ with tab_dashboard:
         total_saidas_dash = dados_fin_dash[dados_fin_dash['Tipo'] == 'Saída']['Valor'].sum()
         resultado_liquido = total_entradas_dash - total_saidas_dash
         
-        # Cartões de Resumo Executivo
         col_m1, col_m2, col_m3 = st.columns(3)
         col_m1.metric("🟢 Total de Ganhos (Entradas)", f"R$ {total_entradas_dash:.2f}")
         col_m2.metric("🔴 Total de Perdas/Despesas", f"R$ {total_saidas_dash:.2f}")
