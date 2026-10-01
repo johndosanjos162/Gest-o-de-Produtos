@@ -312,7 +312,7 @@ if 'Quantidade' not in df_estoque.columns: df_estoque['Quantidade'] = 0
 # FUNÇÃO DE GERAÇÃO DE RELATÓRIO PDF
 # ==========================================
 def gerar_relatorio_pdf():
-    """Gera um PDF com as seções ativas do ERP."""
+    """Gera um PDF completo com todas as seções do ERP integrado ao Supabase."""
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=landscape(A4),
@@ -495,6 +495,14 @@ def gerar_relatorio_pdf():
     doc.build(elementos)
     buffer.seek(0)
     return buffer.getvalue()
+
+# ==========================================
+# CALLBACK PARA ATALHOS DA CALCULADORA
+# (Correção do StreamlitWidgetAlreadyInstantiatedError)
+# ==========================================
+def aplicar_atalho_calc(valor):
+    """Callback executado ANTES do widget ser recriado — evita o erro de widget já instanciado."""
+    st.session_state.calc_valor = float(valor)
 
 # ==========================================
 # ABAS PRINCIPAIS DO ERP
@@ -731,7 +739,7 @@ with tab_vendas:
             empty_state("🛒", "Nenhuma venda registrada", "Registre sua primeira venda na aba acima")
 
 # ==========================================
-# 3.5 CALCULADORA DE VENDA & TROCO
+# 4. CALCULADORA DE VENDA & TROCO
 # ==========================================
 with tab_calculadora:
     secao("🧮 Calculadora de Venda & Troco", "Digite o dinheiro do cliente e veja o que ele pode comprar + troco")
@@ -772,21 +780,30 @@ with tab_calculadora:
 
             with col2:
                 st.markdown("##### 💵 Valor recebido do cliente")
+
+                # Garante valor inicial na session_state ANTES de criar o widget
+                if "calc_valor" not in st.session_state:
+                    st.session_state.calc_valor = 0.0
+
                 valor_recebido = st.number_input(
                     "Digite o valor em dinheiro (R$):",
-                    min_value=0.0, step=0.50, value=0.0,
+                    min_value=0.0, step=0.50,
                     key="calc_valor", format="%.2f",
                     label_visibility="collapsed"
                 )
 
-                # Botões rápidos de valores comuns
+                # Botões rápidos — usando on_click callback para evitar o erro
                 st.caption("Atalhos rápidos:")
                 atalhos_cols = st.columns(4)
                 valores_atalho = [10, 20, 50, 100]
                 for idx, v in enumerate(valores_atalho):
-                    if atalhos_cols[idx].button(f"R$ {v}", key=f"atalho_{v}", use_container_width=True):
-                        st.session_state.calc_valor = float(v)
-                        st.rerun()
+                    atalhos_cols[idx].button(
+                        f"R$ {v}",
+                        key=f"atalho_{v}",
+                        use_container_width=True,
+                        on_click=aplicar_atalho_calc,
+                        args=(float(v),)
+                    )
 
             st.markdown("---")
 
@@ -862,6 +879,9 @@ with tab_calculadora:
                             "tipo": "Entrada", "categoria": "Vendas de Produtos",
                             "valor": float(vlr_total_v)
                         }).execute()
+
+                        # Reseta o valor da calculadora
+                        st.session_state.calc_valor = 0.0
 
                         st.success(f"✅ Venda registrada! Troco: **{moeda(troco)}** | Lucro: **{moeda(lucro_v)}**")
                         st.balloons()
@@ -1011,7 +1031,7 @@ with tab_calculadora:
                 empty_state("🛒", "Carrinho vazio", "Adicione produtos acima para começar a venda")
 
 # ==========================================
-# 4. DESPESAS
+# 5. DESPESAS
 # ==========================================
 with tab_despesas:
     secao("💡 Despesas do Comércio", "Lançamento e gestão de custos operacionais")
@@ -1050,7 +1070,7 @@ with tab_despesas:
             empty_state("💡", "Nenhuma despesa lançada", "Comece lançando sua primeira despesa na aba acima")
 
 # ==========================================
-# 5. FINANCEIRO
+# 6. FINANCEIRO
 # ==========================================
 with tab_financeiro:
     secao("💰 Fluxo de Caixa", "Visualização completa de entradas, saídas e saldo")
@@ -1096,7 +1116,7 @@ with tab_financeiro:
         empty_state("💰", "Nenhum registro financeiro", "Lance vendas ou despesas para começar")
 
 # ==========================================
-# 6. GESTÃO DE CLIENTES
+# 7. GESTÃO DE CLIENTES
 # ==========================================
 with tab_clientes:
     secao("👥 Gestão de Clientes", "Cadastro completo com dados de contato e endereço")
@@ -1161,7 +1181,7 @@ with tab_clientes:
             empty_state("👥", "Nenhum cliente cadastrado", "Comece cadastrando seu primeiro cliente")
 
 # ==========================================
-# 7. DASHBOARD GERAL
+# 8. DASHBOARD GERAL
 # ==========================================
 with tab_dashboard:
     secao("📈 Painel Gerencial", "Visão consolidada do negócio em tempo real")
@@ -1246,12 +1266,12 @@ with tab_dashboard:
                         legend=alt.Legend(title='Classe ABC')
                     ),
                     tooltip=['Classe', alt.Tooltip('Valor Total:Q', format=',.2f')]
-                ).properties(height=280, title='📊 Distribuição de Vendas')
+                ).properties(height=280, title='📊 Curva ABC')
                 st.altair_chart(tema_altair(chart), use_container_width=True)
             else:
-                st.info("Sem dados para distribuição.")
+                st.info("Sem dados para Curva ABC.")
         else:
-            st.info("Registre vendas para ver a distribuição.")
+            st.info("Registre vendas para ver a Curva ABC.")
     
     with col_d:
         if not df_financeiro.empty and 'Tipo' in df_financeiro.columns:
@@ -1272,12 +1292,12 @@ with tab_dashboard:
             st.info("Sem dados financeiros.")
 
 # ==========================================
-# 8. RELATÓRIO PDF INTEGRADO
+# 9. RELATÓRIO PDF INTEGRADO
 # ==========================================
 with tab_relatorio:
     secao("📄 Relatório Geral em PDF", "Documento completo extraído em tempo real do Supabase")
     st.write(
-        "Gere um relatório completo com **as informações do sistema** "
+        "Gere um relatório completo com **todas as informações do sistema** "
         "(Estoque, Vendas, Financeiro e Clientes)."
     )
 
@@ -1297,13 +1317,11 @@ with tab_relatorio:
     if gerar:
         with st.spinner("Gerando relatório e conectando ao Supabase..."):
             try:
-                # Recarrega dados atualizados do Supabase
                 df_estoque = carregar_dados_tabela("estoque")
                 df_vendas = carregar_dados_tabela("vendas")
                 df_financeiro = carregar_dados_tabela("financeiro")
                 df_clientes = carregar_dados_tabela("clientes")
 
-                # Normalização mínima
                 if df_estoque.empty:
                     df_estoque = pd.DataFrame(columns=['id', 'Produto', 'Categoria', 'Quantidade', 'Preço de Custo', 'Valor Unitário'])
                 else:
