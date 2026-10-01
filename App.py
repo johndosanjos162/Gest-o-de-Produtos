@@ -12,19 +12,14 @@ st.set_page_config(layout="wide", page_title="Sistema ERP Integrado", page_icon=
 # CSS dinâmico adaptável para Modo Claro e Modo Escuro nativo do Streamlit
 st.markdown("""
 <style>
-    /* Estilização Geral Adaptável */
     .main { padding: 20px; }
     .title-text { font-weight: 700; font-size: 2.2rem; margin-bottom: 20px; text-align: center; }
-    
-    /* Ajuste para Expander e Abas manterem legibilidade em ambos os temas */
     .stExpander, .stTabs { 
         border-radius: 8px; 
         box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
         margin-bottom: 15px; 
         padding: 10px; 
     }
-    
-    /* Botões principais mantêm destaque consistente */
     .stButton>button { 
         background-color: #4f46e5; 
         color: white; 
@@ -37,7 +32,6 @@ st.markdown("""
     .stButton>button:hover { 
         background-color: #4338ca; 
     }
-    
     .dataframe { border-radius: 8px; overflow: hidden; }
 </style>
 """, unsafe_allow_html=True)
@@ -85,9 +79,6 @@ if not st.session_state.autenticado:
     tela_login()
     st.stop()
 
-# ==========================================
-# BOTÃO DE LOGOUT NA BARRA LATERAL
-# ==========================================
 with st.sidebar:
     st.write(f"Logado como: **Administrador**")
     if st.button("🚪 Sair do Sistema"):
@@ -106,17 +97,18 @@ def carregar_dados_tabela(nome_tabela):
         resposta = supabase.table(nome_tabela).select("*").execute()
         return pd.DataFrame(resposta.data)
     except Exception as e:
-        # Se a tabela ainda não existir no banco, retorna um DataFrame vazio sem travar o sistema
         return pd.DataFrame()
 
-# Carregamento inicial dos dados da nuvem
+# Carregamento inicial de todas as tabelas
 df_estoque = carregar_dados_tabela("estoque")
 df_vendas = carregar_dados_tabela("vendas")
 df_financeiro = carregar_dados_tabela("financeiro")
 df_fornecedores = carregar_dados_tabela("fornecedores")
 df_pedidos_compra = carregar_dados_tabela("pedidos_compra")
+df_clientes = carregar_dados_tabela("clientes")
+df_caixa = carregar_dados_tabela("fechamento_caixa")
 
-# Normalização de colunas vazias para evitar quebras
+# Normalizações para evitar quebras em tabelas vazias
 if df_estoque.empty:
     df_estoque = pd.DataFrame(columns=['id', 'produto', 'categoria', 'quantidade', 'limite_minimo', 'valor_unitario', 'preco_custo'])
 if df_vendas.empty:
@@ -127,63 +119,44 @@ if df_fornecedores.empty:
     df_fornecedores = pd.DataFrame(columns=['id', 'nome_empresa', 'cnpj', 'contato', 'telefone', 'email', 'observacoes'])
 if df_pedidos_compra.empty:
     df_pedidos_compra = pd.DataFrame(columns=['id', 'data', 'fornecedor', 'produto', 'quantidade', 'preco_custo_unitario', 'valor_total', 'status'])
+if df_clientes.empty:
+    df_clientes = pd.DataFrame(columns=['id', 'nome', 'cpf_cnpj', 'telefone', 'email', 'endereco', 'observacoes'])
+if df_caixa.empty:
+    df_caixa = pd.DataFrame(columns=['id', 'data', 'tipo_registro', 'valor', 'responsavel', 'observacao'])
 
-# Padronização de nomes de colunas visualmente para o Estoque
+# Padronizações visuais
 if 'Produto' not in df_estoque.columns and 'produto' in df_estoque.columns:
-    df_estoque = df_estoque.rename(columns={
-        'produto': 'Produto',
-        'categoria': 'Categoria',
-        'quantidade': 'Quantidade',
-        'limite_minimo': 'Limite Mínimo',
-        'valor_unitario': 'Valor Unitário',
-        'preco_custo': 'Preço de Custo'
-    })
-
+    df_estoque = df_estoque.rename(columns={'produto': 'Produto', 'categoria': 'Categoria', 'quantidade': 'Quantidade', 'limite_minimo': 'Limite Mínimo', 'valor_unitario': 'Valor Unitário', 'preco_custo': 'Preço de Custo'})
 if 'Preço de Custo' not in df_estoque.columns:
     df_estoque['Preço de Custo'] = 0.00
-
 if 'Data' not in df_vendas.columns and 'data' in df_vendas.columns:
-    df_vendas = df_vendas.rename(columns={
-        'data': 'Data',
-        'produto': 'Produto',
-        'quantidade': 'Quantidade',
-        'valor_total': 'Valor Total',
-        'lucro': 'Lucro'
-    })
-
+    df_vendas = df_vendas.rename(columns={'data': 'Data', 'produto': 'Produto', 'quantidade': 'Quantidade', 'valor_total': 'Valor Total', 'lucro': 'Lucro'})
 if 'Lucro' not in df_vendas.columns:
     df_vendas['Lucro'] = 0.00
-
 if 'Data' not in df_financeiro.columns and 'data' in df_financeiro.columns:
-    df_financeiro = df_financeiro.rename(columns={
-        'data': 'Data',
-        'descricao': 'Descrição',
-        'tipo': 'Tipo',
-        'categoria': 'Categoria',
-        'valor': 'Valor'
-    })
-
-if 'Categoria' not in df_financeiro.columns:
-    df_financeiro['Categoria'] = 'Geral'
+    df_financeiro = df_financeiro.rename(columns={'data': 'Data', 'descricao': 'Descrição', 'tipo': 'Tipo', 'categoria': 'Categoria', 'valor': 'Valor'})
 
 # ==========================================
-# ABAS PRINCIPAIS DO ERP (INCLUINDO A NOVA)
+# ABAS PRINCIPAIS DO ERP
 # ==========================================
-tab_estoque, tab_vendas, tab_despesas, tab_financeiro, tab_fornecedores, tab_dashboard = st.tabs([
+tab_estoque, tab_vendas, tab_despesas, tab_financeiro, tab_clientes, tab_fornecedores, tab_etiquetas, tab_curva_abc, tab_caixa, tab_dashboard = st.tabs([
     "📦 Estoque", 
     "🛒 Vendas", 
-    "💡 Despesas do Comércio",
-    "💰 Controle Financeiro Total", 
-    "🤝 Fornecedores e Compras",
-    "📊 Dashboard & Gráficos"
+    "💡 Despesas",
+    "💰 Financeiro", 
+    "👥 Clientes",
+    "🤝 Fornecedores & Compras",
+    "🏷️ Etiquetas",
+    "📊 Curva ABC & Vendas",
+    "💵 Caixa & Sangria",
+    "📈 Dashboard"
 ])
 
 # ==========================================
-# ABA 1: ESTOQUE
+# 1. ESTOQUE
 # ==========================================
 with tab_estoque:
     st.subheader("📦 Gestão de Estoque")
-    
     with st.expander("Adicionar Novo Produto"):
         with st.form("form_produto"):
             col1, col2 = st.columns(2)
@@ -196,646 +169,404 @@ with tab_estoque:
                 qtd = st.number_input("Quantidade Inicial", min_value=0, step=1)
                 limite = st.number_input("Limite Mínimo de Alerta", min_value=0, step=1)
             
-            btn_adicionar = st.form_submit_button("Cadastrar Produto")
-            
-            if btn_adicionar and nome:
-                produto_existe = False
-                if not df_estoque.empty:
-                    produto_existe = df_estoque['Produto'].str.lower().eq(nome.strip().lower()).any()
-                
-                if produto_existe:
-                    st.error(f"⚠️ Erro: O produto '{nome}' já está cadastrado no estoque!")
-                else:
-                    try:
-                        supabase.table("estoque").insert({
-                            "produto": nome.strip(),
-                            "categoria": categoria,
-                            "quantidade": int(qtd),
-                            "limite_minimo": int(limite),
-                            "valor_unitario": float(preco),
-                            "preco_custo": float(preco_custo)
-                        }).execute()
-                        st.success("✅ Produto cadastrado com sucesso no Supabase!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao salvar produto: {e}")
+            if st.form_submit_button("Cadastrar Produto") and nome:
+                try:
+                    supabase.table("estoque").insert({
+                        "produto": nome.strip(), "categoria": categoria, "quantidade": int(qtd),
+                        "limite_minimo": int(limite), "valor_unitario": float(preco), "preco_custo": float(preco_custo)
+                    }).execute()
+                    st.success("✅ Produto cadastrado!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro: {e}")
 
     with st.expander("Atualizar Estoque, Custos e Preços"):
         if not df_estoque.empty:
-            produtos_disponiveis = df_estoque['Produto'].tolist()
-            produto_selecionado = st.selectbox("Selecione o produto para atualizar:", produtos_disponiveis, key="select_update")
+            prod_sel = st.selectbox("Selecione o produto:", df_estoque['Produto'].tolist(), key="up_est")
+            item = df_estoque[df_estoque['Produto'] == prod_sel].iloc[0]
             
-            item_atual = df_estoque[df_estoque['Produto'] == produto_selecionado].iloc[0]
-            item_id = item_atual['id']
-            quantidade_atual = item_atual['Quantidade']
-            preco_atual = item_atual['Valor Unitário']
-            custo_atual = item_atual['Preço de Custo']
+            nova_qtd = st.number_input("Nova Quantidade", value=int(item['Quantidade']), min_value=0, step=1)
+            novo_custo = st.number_input("Novo Custo (R$)", value=float(item['Preço de Custo']), min_value=0.0, step=0.01)
+            novo_venda = st.number_input("Novo Valor de Venda (R$)", value=float(item['Valor Unitário']), min_value=0.0, step=0.01)
             
-            nova_quantidade = st.number_input("Nova Quantidade em Estoque", value=int(quantidade_atual), min_value=0, step=1)
-            novo_custo = st.number_input("Novo Preço de Custo (R$)", value=float(custo_atual), min_value=0.0, step=0.01)
-            novo_preco = st.number_input("Novo Valor Unitário / Venda (R$)", value=float(preco_atual), min_value=0.0, step=0.01)
-            
-            if st.button("Atualizar Dados"):
+            if st.button("Salvar Alterações de Estoque"):
                 try:
-                    supabase.table("estoque").update({
-                        "quantidade": int(nova_quantidade),
-                        "preco_custo": float(novo_custo),
-                        "valor_unitario": float(novo_preco)
-                    }).eq("id", item_id).execute()
-                    st.success("Dados atualizados com sucesso no Supabase!")
+                    supabase.table("estoque").update({"quantidade": int(nova_qtd), "preco_custo": float(novo_custo), "valor_unitario": float(novo_venda)}).eq("id", item['id']).execute()
+                    st.success("Atualizado com sucesso!")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Erro ao atualizar: {e}")
+                    st.error(f"Erro: {e}")
         else:
-            st.info("Nenhum produto cadastrado para atualizar.")
-
-    with st.expander("Remover Produto"):
-        if not df_estoque.empty:
-            produtos_disponiveis_remover = df_estoque['Produto'].tolist()
-            produto_remover = st.selectbox("Selecione o produto para remover:", produtos_disponiveis_remover, key="select_remove")
-            if st.button("Excluir Produto"):
-                try:
-                    item_id = df_estoque[df_estoque['Produto'] == produto_remover].iloc[0]['id']
-                    supabase.table("estoque").delete().eq("id", item_id).execute()
-                    st.success(f"Produto '{produto_remover}' removido com sucesso!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro ao excluir: {e}")
-        else:
-            st.info("Nenhum produto cadastrado para remover.")
+            st.info("Estoque vazio.")
 
     dados_est = df_estoque.copy()
     if not dados_est.empty:
-        produtos_em_alerta = dados_est[dados_est['Quantidade'] <= dados_est['Limite Mínimo']]
-        if not produtos_em_alerta.empty:
-            st.warning("⚠ **Atenção: Os seguintes produtos estão com estoque baixo!**")
-            for _, row in produtos_em_alerta.iterrows():
-                st.error(f"📉 **{row['Produto']}**: Restam apenas {row['Quantidade']} unidades (Limite: {row['Limite Mínimo']})")
-        
         dados_est['Valor Custo Total'] = dados_est['Quantidade'] * dados_est['Preço de Custo']
         dados_est['Valor Venda Total'] = dados_est['Quantidade'] * dados_est['Valor Unitário']
-        
-        total_investido = dados_est['Valor Custo Total'].sum()
-        total_projetado = dados_est['Valor Venda Total'].sum()
-        lucro_potencial = total_projetado - total_investido
-        
-        c_m1, c_m2, c_m3 = st.columns(3)
-        c_m1.metric("💵 Dinheiro Investido (Custo)", f"R$ {total_investido:.2f}")
-        c_m2.metric("🏷️ Valor Total de Venda", f"R$ {total_projetado:.2f}")
-        c_m3.metric("📈 Lucro Potencial (Estoque)", f"R$ {lucro_potencial:.2f}")
-        
-        st.subheader("Estoque Atual")
-        st.dataframe(dados_est[['Produto', 'Categoria', 'Quantidade', 'Preço de Custo', 'Valor Unitário', 'Valor Custo Total', 'Valor Venda Total']].style.format({'Preço de Custo': 'R$ {:.2f}', 'Valor Unitário': 'R$ {:.2f}', 'Valor Custo Total': 'R$ {:.2f}', 'Valor Venda Total': 'R$ {:.2f}'}), hide_index=True)
-    else:
-        st.info("Seu estoque está vazio no momento.")
+        st.dataframe(dados_est[['Produto', 'Categoria', 'Quantidade', 'Preço de Custo', 'Valor Unitário', 'Valor Custo Total']].style.format({'Preço de Custo': 'R$ {:.2f}', 'Valor Unitário': 'R$ {:.2f}', 'Valor Custo Total': 'R$ {:.2f}'}), hide_index=True)
 
 # ==========================================
-# ABA 2: VENDAS
+# 2. VENDAS
 # ==========================================
 with tab_vendas:
     st.subheader("🛒 Registro de Vendas")
-    
     with st.form("form_venda"):
         if not df_estoque.empty:
             prod_venda = st.selectbox("Produto Vendido", df_estoque['Produto'].tolist())
-            qtd_venda = st.number_input("Quantidade Vendida", min_value=1, step=1)
-            btn_venda = st.form_submit_button("Registrar Venda")
+            qtd_venda = st.number_input("Quantidade", min_value=1, step=1)
             
-            if btn_venda:
+            if st.form_submit_button("Registrar Venda"):
                 item_est = df_estoque[df_estoque['Produto'] == prod_venda].iloc[0]
-                item_id = item_est['id']
                 estoque_atual = int(item_est['Quantidade'])
-                valor_unit = float(item_est['Valor Unitário'])
-                custo_unit = float(item_est['Preço de Custo'])
                 
                 if qtd_venda <= estoque_atual:
-                    novo_estoque = estoque_atual - qtd_venda
-                    vlr_total = qtd_venda * valor_unit
-                    lucro_venda = (valor_unit - custo_unit) * qtd_venda
+                    vlr_total = qtd_venda * float(item_est['Valor Unitário'])
+                    lucro_venda = (float(item_est['Valor Unitário']) - float(item_est['Preço de Custo'])) * qtd_venda
                     data_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     
-                    try:
-                        supabase.table("estoque").update({"quantidade": novo_estoque}).eq("id", item_id).execute()
-                        supabase.table("vendas").insert({
-                            "data": data_str,
-                            "produto": prod_venda,
-                            "quantidade": int(qtd_venda),
-                            "valor_total": float(vlr_total),
-                            "lucro": float(lucro_venda)
-                        }).execute()
-                        supabase.table("financeiro").insert({
-                            "data": data_str,
-                            "descricao": f"Venda automática: {prod_venda} ({qtd_venda} un)",
-                            "tipo": "Entrada",
-                            "categoria": "Vendas de Produtos",
-                            "valor": float(vlr_total)
-                        }).execute()
-                        
-                        st.success("✅ Venda registrada! Estoque baixado e entrada financeira lançada automaticamente.")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao registrar venda: {e}")
-                else:
-                    st.error(f"Quantidade em estoque insuficiente! (Disponível: {estoque_atual})")
-        else:
-            st.info("Cadastre produtos no estoque antes de registrar vendas.")
-            btn_venda = st.form_submit_button("Registrar Venda", disabled=True)
-
-    with st.expander("✏️ Editar ou Cancelar Venda (Corrigir Erros)"):
-        if not df_vendas.empty:
-            opcoes_venda = []
-            for _, row in df_vendas.iterrows():
-                texto = f"ID: {row['id']} | {row['Data']} | {row['Produto']} | Qtd: {row['Quantidade']} | R$ {row['Valor Total']:.2f}"
-                opcoes_venda.append(texto)
-                
-            venda_selecionada = st.selectbox("Selecione a venda para corrigir:", opcoes_venda)
-            venda_id_str = venda_selecionada.split("|")[0].replace("ID:", "").strip()
-            
-            venda_atual = df_vendas[df_vendas['id'].astype(str) == venda_id_str].iloc[0]
-            old_prod = venda_atual['Produto']
-            old_qtd = int(venda_atual['Quantidade'])
-            old_total = float(venda_atual['Valor Total'])
-            
-            lista_produtos = df_estoque['Produto'].tolist() if not df_estoque.empty else []
-            index_prod = lista_produtos.index(old_prod) if old_prod in lista_produtos else 0
-            
-            with st.form("form_editar_venda"):
-                st.write("**Novos dados da venda:**")
-                novo_prod = st.selectbox("Produto Correto", lista_produtos, index=index_prod) if lista_produtos else st.text_input("Produto", old_prod)
-                nova_qtd = st.number_input("Quantidade Correta", min_value=1, step=1, value=old_qtd)
-                
-                col1, col2 = st.columns(2)
-                btn_salvar_venda = col1.form_submit_button("Salvar Alteração")
-                btn_cancelar_venda = col2.form_submit_button("Cancelar Venda (Estornar tudo)")
-                
-                if btn_cancelar_venda:
-                    try:
-                        if not df_estoque.empty and old_prod in df_estoque['Produto'].values:
-                            est_item = df_estoque[df_estoque['Produto'] == old_prod].iloc[0]
-                            novo_qtd_est = int(est_item['Quantidade']) + old_qtd
-                            supabase.table("estoque").update({"quantidade": novo_qtd_est}).eq("id", est_item['id']).execute()
-                        
-                        supabase.table("vendas").delete().eq("id", venda_atual['id']).execute()
-                        
-                        fin_match = df_financeiro[(df_financeiro['Descrição'].str.contains(old_prod)) & (df_financeiro['Valor'] == old_total)]
-                        if not fin_match.empty:
-                            supabase.table("financeiro").delete().eq("id", fin_match.iloc[0]['id']).execute()
-                        
-                        st.success("Venda cancelada! Estoque estornado e lançamento financeiro removido.")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao cancelar venda: {e}")
+                    supabase.table("estoque").update({"quantidade": estoque_atual - qtd_venda}).eq("id", item_est['id']).execute()
+                    supabase.table("vendas").insert({"data": data_str, "produto": prod_venda, "quantidade": int(qtd_venda), "valor_total": float(vlr_total), "lucro": float(lucro_venda)}).execute()
+                    supabase.table("financeiro").insert({"data": data_str, "descricao": f"Venda: {prod_venda} ({qtd_venda} un)", "tipo": "Entrada", "categoria": "Vendas de Produtos", "valor": float(vlr_total)}).execute()
                     
-                if btn_salvar_venda:
-                    try:
-                        if not df_estoque.empty and old_prod in df_estoque['Produto'].values:
-                            est_old = df_estoque[df_estoque['Produto'] == old_prod].iloc[0]
-                            supabase.table("estoque").update({"quantidade": int(est_old['Quantidade']) + old_qtd}).eq("id", est_old['id']).execute()
-                        
-                        est_new = df_estoque[df_estoque['Produto'] == novo_prod].iloc[0]
-                        disponivel = int(est_new['Quantidade'])
-                        
-                        if nova_qtd <= disponivel:
-                            novo_estoque_val = disponivel - nova_qtd
-                            novo_total = nova_qtd * float(est_new['Valor Unitário'])
-                            novo_lucro = (float(est_new['Valor Unitário']) - float(est_new['Preço de Custo'])) * nova_qtd
-                            
-                            supabase.table("estoque").update({"quantidade": novo_estoque_val}).eq("id", est_new['id']).execute()
-                            supabase.table("vendas").update({
-                                "produto": novo_prod,
-                                "quantidade": int(nova_qtd),
-                                "valor_total": float(novo_total),
-                                "lucro": float(novo_lucro)
-                            }).eq("id", venda_atual['id']).execute()
-                            
-                            fin_match = df_financeiro[(df_financeiro['Descrição'].str.contains(old_prod)) & (df_financeiro['Valor'] == old_total)]
-                            if not fin_match.empty:
-                                supabase.table("financeiro").update({
-                                    "descricao": f"Venda automática: {novo_prod} ({nova_qtd} un)",
-                                    "valor": float(novo_total)
-                                }).eq("id", fin_match.iloc[0]['id']).execute()
-                                
-                            st.success("Venda atualizada com sucesso!")
-                            st.rerun()
-                        else:
-                            st.error(f"Estoque insuficiente para '{novo_prod}'! (Disponível: {disponivel})")
-                    except Exception as e:
-                        st.error(f"Erro ao atualizar venda: {e}")
+                    st.success("✅ Venda registrada com baixa automática!")
+                    st.rerun()
+                else:
+                    st.error("Estoque insuficiente!")
         else:
-            st.info("Nenhuma venda para editar.")
+            st.warning("Cadastre produtos primeiro.")
 
-    st.subheader("Histórico de Vendas")
     if not df_vendas.empty:
         st.dataframe(df_vendas[['Data', 'Produto', 'Quantidade', 'Valor Total', 'Lucro']].style.format({'Valor Total': 'R$ {:.2f}', 'Lucro': 'R$ {:.2f}'}), hide_index=True)
-    else:
-        st.info("Nenhuma venda registrada ainda.")
 
 # ==========================================
-# ABA 3: DESPESAS DO COMÉRCIO
+# 3. DESPESAS
 # ==========================================
 with tab_despesas:
-    st.subheader("💡 Controle de Despesas Operacionais do Comércio")
-    st.write("Registre rapidamente contas como **Água, Energia/Luz, Internet, Aluguel** e gerencie os lançamentos incorretos.")
-    
-    sub_aba_cadastro, sub_aba_gerenciar = st.tabs(["➕ Nova Despesa", "✏️ Gerenciar, Editar ou Excluir Despesas"])
-    
-    with sub_aba_cadastro:
-        with st.form("form_despesas_comercio"):
-            c1, c2 = st.columns(2)
-            with c1:
-                categoria_despesa = st.selectbox(
-                    "Categoria da Despesa", 
-                    ["Energia / Luz", "Água", "Internet / Telefone", "Aluguel", "Manutenção", "Impostos e Taxas", "Outros"]
-                )
-                descricao_despesa = st.text_input("Descrição / Referência (Ex: Conta de Luz - Mês Referência)")
-            with c2:
-                valor_despesa = st.number_input("Valor da Despesa (R$)", min_value=0.01, step=0.01)
-                data_despesa = st.date_input("Data do Vencimento / Pagamento", value=datetime.now())
-                
-            btn_salvar_despesa = st.form_submit_button("Lançar Despesa do Comércio", use_container_width=True)
+    st.subheader("💡 Despesas do Comércio")
+    with st.form("form_desp"):
+        c1, c2 = st.columns(2)
+        with c1:
+            cat_d = st.selectbox("Categoria", ["Energia / Luz", "Água", "Internet", "Aluguel", "Manutenção", "Impostos", "Outros"])
+            desc_d = st.text_input("Descrição / Referência")
+        with c2:
+            vlr_d = st.number_input("Valor (R$)", min_value=0.01, step=0.01)
+            data_d = st.date_input("Data", value=datetime.now())
             
-            if btn_salvar_despesa and descricao_despesa:
-                try:
-                    data_str = f"{data_despesa} {datetime.now().strftime('%H:%M:%S')}"
-                    supabase.table("financeiro").insert({
-                        "data": data_str,
-                        "descricao": descricao_despesa.strip(),
-                        "tipo": "Saída",
-                        "categoria": f"Despesa: {categoria_despesa}",
-                        "valor": float(valor_despesa)
-                    }).execute()
-                    st.success(f"✅ Despesa de '{categoria_despesa}' lançada com sucesso no fluxo de caixa!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro ao registrar despesa: {e}")
-
-    with sub_aba_gerenciar:
-        st.write("### 📋 Histórico e Gestão de Despesas Cadastradas")
-        dados_fin_gasto = df_financeiro.copy()
-        
-        if not dados_fin_gasto.empty:
-            despesas_apenas = dados_fin_gasto[dados_fin_gasto['Tipo'] == 'Saída'].copy()
-            
-            if not despesas_apenas.empty:
-                despesas_comercio = despesas_apenas[despesas_apenas['Categoria'].str.startswith('Despesa:')].copy()
-                
-                if not despesas_comercio.empty:
-                    st.dataframe(despesas_comercio[['id', 'Data', 'Categoria', 'Descrição', 'Valor']].style.format({'Valor': 'R$ {:.2f}'}), hide_index=True)
-                    
-                    st.markdown("---")
-                    st.write("#### 🛠️ Escolha uma Despesa para Excluir ou Editar")
-                    
-                    opcoes_despesas = []
-                    for _, row in despesas_comercio.iterrows():
-                        texto_op = f"ID: {row['id']} | {row['Data']} | {row['Categoria']} - {row['Descrição']} | R$ {row['Valor']:.2f}"
-                        opcoes_despesas.append(texto_op)
-                        
-                    despesa_selecionada = st.selectbox("Selecione o registro da despesa:", opcoes_despesas)
-                    id_selecionado = despesa_selecionada.split("|")[0].replace("ID:", "").strip()
-                    
-                    item_despesa_atual = despesas_comercio[despesas_comercio['id'].astype(str) == id_selecionado].iloc[0]
-                    
-                    cat_atual_limpa = item_despesa_atual['Categoria'].replace("Despesa: ", "").strip()
-                    categorias_possiveis = ["Energia / Luz", "Água", "Internet / Telefone", "Aluguel", "Manutenção", "Impostos e Taxas", "Outros"]
-                    idx_cat = categorias_possiveis.index(cat_atual_limpa) if cat_atual_limpa in categorias_possiveis else 0
-                    
-                    col_b1, col_b2 = st.columns(2)
-                    
-                    with col_b1:
-                        if st.button("🗑️ Excluir Despesa Selecionada", use_container_width=True):
-                            try:
-                                supabase.table("financeiro").delete().eq("id", id_selecionado).execute()
-                                st.success("Despesa excluída com sucesso!")
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Erro ao excluir despesa: {e}")
-                                
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    with st.form("form_editar_despesa"):
-                        st.write("#### ✏️ Modificar Dados da Despesa")
-                        nova_cat = st.selectbox("Nova Categoria", categorias_possiveis, index=idx_cat)
-                        nova_desc = st.text_input("Nova Descrição", value=item_despesa_atual['Descrição'])
-                        novo_vlr = st.number_input("Novo Valor (R$)", value=float(item_despesa_atual['Valor']), min_value=0.01, step=0.01)
-                        
-                        btn_salvar_edicao = st.form_submit_button("💾 Salvar Alterações da Despesa", use_container_width=True)
-                        
-                        if btn_salvar_edicao:
-                            try:
-                                supabase.table("financeiro").update({
-                                    "descricao": nova_desc.strip(),
-                                    "categoria": f"Despesa: {nova_cat}",
-                                    "valor": float(novo_vlr)
-                                }).eq("id", id_selecionado).execute()
-                                st.success("Despesa atualizada com sucesso!")
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Erro ao atualizar despesa: {e}")
-                else:
-                    st.info("Nenhuma despesa do comércio cadastrada ainda.")
-            else:
-                st.info("Nenhuma saída registrada no sistema.")
-        else:
-            st.info("Nenhum dado financeiro registrado.")
+        if st.form_submit_button("Lançar Despesa"):
+            supabase.table("financeiro").insert({
+                "data": f"{data_d} {datetime.now().strftime('%H:%M:%S')}",
+                "descricao": desc_d, "tipo": "Saída", "categoria": f"Despesa: {cat_d}", "valor": float(vlr_d)
+            }).execute()
+            st.success("Despesa lançada!")
+            st.rerun()
 
 # ==========================================
-# ABA 4: CONTROLE FINANCEIRO TOTAL
+# 4. FINANCEIRO
 # ==========================================
 with tab_financeiro:
-    st.subheader("💰 Gestão Financeira Completa (Fluxo de Caixa)")
-    
-    fin_tab_lancamento, fin_tab_extrato, fin_tab_analise = st.tabs(["➕ Novo Lançamento Manual", "📋 Extrato e Gestão", "📊 Relatórios e Indicadores"])
-    
-    with fin_tab_lancamento:
-        st.write("### Registrar Outras Entradas ou Saídas Manuais")
-        with st.form("form_fin_total"):
-            c1, c2 = st.columns(2)
-            with c1:
-                tipo = st.selectbox("Tipo de Movimentação", ["Entrada", "Saída"])
-                desc = st.text_input("Descrição / Histórico (Ex: Aporte, Venda Avulsa)")
-            with c2:
-                if tipo == "Entrada":
-                    cat_fin = st.selectbox("Categoria", ["Serviços Prestados", "Aporte de Capital", "Rendimentos / Juros", "Outras Entradas"])
-                else:
-                    cat_fin = st.selectbox("Categoria", ["Compra de Mercadoria / Estoque", "Despesas Operacionais", "Salários / Pró-labore", "Outras Saídas"])
-                valor = st.number_input("Valor (R$)", min_value=0.01, step=0.01)
-                
-            data_lancamento = st.date_input("Data da Movimentação", value=datetime.now())
-            
-            btn_salvar_fin = st.form_submit_button("Salvar Lançamento Manual", use_container_width=True)
-            
-            if btn_salvar_fin and desc:
-                try:
-                    data_str = f"{data_lancamento} {datetime.now().strftime('%H:%M:%S')}"
-                    supabase.table("financeiro").insert({
-                        "data": data_str,
-                        "descricao": desc.strip(),
-                        "tipo": tipo,
-                        "categoria": cat_fin,
-                        "valor": float(valor)
-                    }).execute()
-                    st.success("✅ Transação financeira manual registrada com sucesso!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro ao salvar transação: {e}")
-
-    with fin_tab_extrato:
-        st.write("### Histórico Unificado de Caixa (Vendas + Despesas + Manuais)")
-        dados_fin = df_financeiro.copy()
-        
-        if not dados_fin.empty:
-            col_f1, col_f2 = st.columns(2)
-            filtro_tipo = col_f1.selectbox("Filtrar por Tipo", ["Todos", "Entrada", "Saída"])
-            if filtro_tipo != "Todos":
-                dados_fin = dados_fin[dados_fin['Tipo'] == filtro_tipo]
-                
-            categorias_disponiveis = ["Todas"] + list(dados_fin['Categoria'].unique()) if 'Categoria' in dados_fin.columns else ["Todas"]
-            filtro_cat = col_f2.selectbox("Filtrar por Categoria", categorias_disponiveis)
-            if filtro_cat != "Todas":
-                dados_fin = dados_fin[dados_fin['Categoria'] == filtro_cat]
-
-            st.dataframe(dados_fin[['id', 'Data', 'Tipo', 'Categoria', 'Descrição', 'Valor']].style.format({'Valor': 'R$ {:.2f}'}), hide_index=True)
-            
-            st.markdown("---")
-            st.write("#### Excluir Lançamento Financeiro")
-            opcoes_exclusao = []
-            for _, row in dados_fin.iterrows():
-                texto = f"ID: {row['id']} | {row['Data']} | [{row['Tipo']}] {row['Categoria']} - {row['Descrição']} | R$ {row['Valor']:.2f}"
-                opcoes_exclusao.append(texto)
-                
-            if opcoes_exclusao:
-                transacao_excluir = st.selectbox("Selecione o lançamento para apagar:", opcoes_exclusao)
-                if st.button("🗑️ Apagar Lançamento Selecionado"):
-                    id_excluir = transacao_excluir.split("|")[0].replace("ID:", "").strip()
-                    try:
-                        supabase.table("financeiro").delete().eq("id", id_excluir).execute()
-                        st.success("Transação apagada com sucesso!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao apagar: {e}")
-        else:
-            st.info("Nenhuma movimentação financeira registrada.")
-
-    with fin_tab_analise:
-        st.write("### 📊 Indicadores e Resumo de Caixa")
-        dados_fin_completo = df_financeiro.copy()
-        
-        if not dados_fin_completo.empty:
-            total_entradas = dados_fin_completo[dados_fin_completo['Tipo'] == 'Entrada']['Valor'].sum()
-            total_saidas = dados_fin_completo[dados_fin_completo['Tipo'] == 'Saída']['Valor'].sum()
-            saldo_caixa = total_entradas - total_saidas
-            
-            lucro_vendas = df_vendas['Lucro'].sum() if not df_vendas.empty else 0.0
-            
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("🟢 Total de Entradas (Vendas + Outras)", f"R$ {total_entradas:.2f}")
-            c2.metric("🔴 Total de Saídas (Despesas)", f"R$ {total_saidas:.2f}")
-            c3.metric("💰 Saldo Líquido em Caixa", f"R$ {saldo_caixa:.2f}", delta=f"R$ {saldo_caixa:.2f}")
-            c4.metric("📈 Lucro Bruto (Vendas)", f"R$ {lucro_vendas:.2f}")
-            
-            st.markdown("---")
-            st.write("#### Despesas por Categoria")
-            saidas_df = dados_fin_completo[dados_fin_completo['Tipo'] == 'Saída']
-            if not saidas_df.empty:
-                gasto_por_cat = saidas_df.groupby('Categoria')['Valor'].sum().reset_index()
-                st.dataframe(gasto_por_cat.style.format({'Valor': 'R$ {:.2f}'}), hide_index=True)
-            else:
-                st.info("Nenhuma saída/despesa registrada para detalhar por categoria.")
-        else:
-            st.info("Cadastre movimentações financeiras para visualizar os relatórios.")
+    st.subheader("💰 Fluxo de Caixa Completo")
+    if not df_financeiro.empty:
+        total_ent = df_financeiro[df_financeiro['Tipo'] == 'Entrada']['Valor'].sum()
+        total_sai = df_financeiro[df_financeiro['Tipo'] == 'Saída']['Valor'].sum()
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Entradas", f"R$ {total_ent:.2f}")
+        c2.metric("Saídas", f"R$ {total_sai:.2f}")
+        c3.metric("Saldo Líquido", f"R$ {total_ent - total_sai:.2f}")
+        st.dataframe(df_financeiro[['id', 'Data', 'Tipo', 'Categoria', 'Descrição', 'Valor']].style.format({'Valor': 'R$ {:.2f}'}), hide_index=True)
+    else:
+        st.info("Nenhum registro financeiro.")
 
 # ==========================================
-# ABA 5: FORNECEDORES E PEDIDOS DE COMPRA (NOVO MÓDULO)
+# 5. GESTÃO DE CLIENTES (NOVO)
+# ==========================================
+with tab_clientes:
+    st.subheader("👥 Gestão de Clientes")
+    sub_c_cad, sub_c_lista = st.tabs(["➕ Cadastrar Cliente", "📋 Diretório de Clientes"])
+    
+    with sub_c_cad:
+        with st.form("form_cliente"):
+            c1, c2 = st.columns(2)
+            with c1:
+                nome_cli = st.text_input("Nome Completo / Razão Social *")
+                cpf_cnpj = st.text_input("CPF ou CNPJ")
+                tel_cli = st.text_input("Telefone / WhatsApp")
+            with c2:
+                email_cli = st.text_input("E-mail")
+                end_cli = st.text_input("Endereço Completo")
+                obs_cli = st.text_area("Observações / Histórico")
+                
+            if st.form_submit_button("Salvar Cliente") and nome_cli:
+                try:
+                    supabase.table("clientes").insert({
+                        "nome": nome_cli.strip(), "cpf_cnpj": cpf_cnpj.strip(), "telefone": tel_cli.strip(),
+                        "email": email_cli.strip(), "endereco": end_cli.strip(), "observacoes": obs_cli.strip()
+                    }).execute()
+                    st.success(f"✅ Cliente '{nome_cli}' cadastrado com sucesso!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro: {e}")
+                    
+    with sub_c_lista:
+        if not df_clientes.empty:
+            st.dataframe(df_clientes[['nome', 'cpf_cnpj', 'telefone', 'email', 'endereco', 'observacoes']], hide_index=True)
+            
+            st.markdown("---")
+            cli_del = st.selectbox("Excluir Cliente:", df_clientes['nome'].tolist())
+            if st.button("Remover Cliente Selecionado"):
+                id_c = df_clientes[df_clientes['nome'] == cli_del].iloc[0]['id']
+                supabase.table("clientes").delete().eq("id", id_c).execute()
+                st.success("Cliente removido!")
+                st.rerun()
+        else:
+            st.info("Nenhum cliente cadastrado.")
+
+# ==========================================
+# 6. FORNECEDORES E COMPRAS
 # ==========================================
 with tab_fornecedores:
-    st.subheader("🤝 Gestão de Fornecedores e Pedidos de Compra")
+    st.subheader("🤝 Fornecedores e Pedidos de Compra")
+    sub_f_cad, sub_f_ped, sub_f_hist = st.tabs(["➕ Novo Fornecedor", "📦 Registrar Pedido", "📋 Listas"])
     
-    sub_forn_cadastro, sub_forn_pedidos, sub_forn_lista = st.tabs([
-        "➕ Cadastrar Fornecedor", 
-        "📦 Registrar Pedido / Compra", 
-        "📋 Diretório e Histórico"
-    ])
-    
-    with sub_forn_cadastro:
-        st.write("### 🏢 Cadastro de Novo Fornecedor")
-        with st.form("form_cad_fornecedor"):
+    with sub_f_cad:
+        with st.form("form_forn"):
             c1, c2 = st.columns(2)
             with c1:
-                nome_empresa = st.text_input("Nome da Empresa / Fornecedor *")
-                cnpj = st.text_input("CNPJ")
-                contato = st.text_input("Nome do Representante / Vendedor")
+                f_nome = st.text_input("Empresa *")
+                f_cnpj = st.text_input("CNPJ")
+                f_cont = st.text_input("Representante")
             with c2:
-                telefone = st.text_input("Telefone / WhatsApp")
-                email = st.text_input("E-mail")
-                observacoes = st.text_area("Observações (Ex: Condições de pagamento, dias de entrega)")
-                
-            btn_salvar_forn = st.form_submit_button("Salvar Fornecedor", use_container_width=True)
-            
-            if btn_salvar_forn and nome_empresa:
-                try:
-                    supabase.table("fornecedores").insert({
-                        "nome_empresa": nome_empresa.strip(),
-                        "cnpj": cnpj.strip(),
-                        "contato": contato.strip(),
-                        "telefone": telefone.strip(),
-                        "email": email.strip(),
-                        "observacoes": observacoes.strip()
-                    }).execute()
-                    st.success(f"✅ Fornecedor '{nome_empresa}' cadastrado com sucesso!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro ao salvar fornecedor: {e}")
+                f_tel = st.text_input("Telefone")
+                f_email = st.text_input("E-mail")
+                f_obs = st.text_area("Observações")
+            if st.form_submit_button("Salvar Fornecedor") and f_nome:
+                supabase.table("fornecedores").insert({"nome_empresa": f_nome, "cnpj": f_cnpj, "contato": f_cont, "telefone": f_tel, "email": f_email, "observacoes": f_obs}).execute()
+                st.success("Fornecedor salvo!")
+                st.rerun()
 
-    with sub_forn_pedidos:
-        st.write("### 📦 Novo Pedido de Compra / Reposição")
-        st.write("Registre compras de mercadorias. Você pode optar por **atualizar automaticamente o estoque** e lançar a despesa no caixa.")
-        
+    with sub_f_ped:
         if not df_fornecedores.empty:
-            lista_forn_nomes = df_fornecedores['nome_empresa'].tolist()
-            lista_est_produtos = df_estoque['Produto'].tolist() if not df_estoque.empty else []
-            
-            with st.form("form_novo_pedido"):
+            with st.form("form_ped"):
                 c1, c2 = st.columns(2)
                 with c1:
-                    forn_selecionado = st.selectbox("Selecione o Fornecedor", lista_forn_nomes)
-                    if lista_est_produtos:
-                        prod_compra = st.selectbox("Produto Comprado", lista_est_produtos)
-                    else:
-                        prod_compra = st.text_input("Nome do Produto Comprado")
-                    qtd_comprada = st.number_input("Quantidade Adquirida", min_value=1, step=1)
+                    f_sel = st.selectbox("Fornecedor", df_fornecedores['nome_empresa'].tolist())
+                    p_sel = st.selectbox("Produto", df_estoque['Produto'].tolist()) if not df_estoque.empty else st.text_input("Produto")
+                    qtd_comp = st.number_input("Quantidade", min_value=1, step=1)
                 with c2:
-                    custo_unit_compra = st.number_input("Preço de Custo Unitário (R$)", min_value=0.01, step=0.01)
-                    data_compra = st.date_input("Data do Pedido", value=datetime.now())
-                    status_pedido = st.selectbox("Status da Compra", ["Entregue", "Pendente"])
+                    custo_u = st.number_input("Custo Unitário (R$)", min_value=0.01, step=0.01)
+                    st_ped = st.selectbox("Status", ["Pendente", "Entregue"])
                 
-                integrar_caixa = st.checkbox("Lançar valor total automaticamente como SAÍDA no Fluxo Financeiro?", value=True)
-                atualizar_est = st.checkbox("Adicionar quantidade comprada ao Estoque atual?", value=True)
+                up_est_auto = st.checkbox("Atualizar Estoque Automaticamente?", value=True)
+                lanc_cx = st.checkbox("Lançar como Saída no Financeiro?", value=True)
                 
-                btn_salvar_pedido = st.form_submit_button("Registrar Pedido de Compra", use_container_width=True)
-                
-                if btn_salvar_pedido and prod_compra:
-                    try:
-                        vlr_total_compra = qtd_comprada * custo_unit_compra
-                        data_str = f"{data_compra} {datetime.now().strftime('%H:%M:%S')}"
+                if st.form_submit_button("Registrar Pedido de Compra"):
+                    total_p = qtd_comp * custo_u
+                    dt_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    supabase.table("pedidos_compra").insert({"data": dt_str, "fornecedor": f_sel, "produto": p_sel, "quantidade": int(qtd_comp), "preco_custo_unitario": float(custo_u), "valor_total": float(total_p), "status": st_ped}).execute()
+                    
+                    if up_est_auto and not df_estoque.empty and p_sel in df_estoque['Produto'].values:
+                        it = df_estoque[df_estoque['Produto'] == p_sel].iloc[0]
+                        supabase.table("estoque").update({"quantidade": int(it['Quantidade']) + int(qtd_comp), "preco_custo": float(custo_u)}).eq("id", it['id']).execute()
+                    
+                    if lanc_cx:
+                        supabase.table("financeiro").insert({"data": dt_str, "descricao": f"Compra ({f_sel}): {p_sel}", "tipo": "Saída", "categoria": "Compra de Mercadoria / Estoque", "valor": float(total_p)}).execute()
                         
-                        # 1. Salvar pedido na tabela de pedidos_compra
-                        supabase.table("pedidos_compra").insert({
-                            "data": data_str,
-                            "fornecedor": forn_selecionado,
-                            "produto": prod_compra,
-                            "quantidade": int(qtd_comprada),
-                            "preco_custo_unitario": float(custo_unit_compra),
-                            "valor_total": float(vlr_total_compra),
-                            "status": status_pedido
-                        }).execute()
-                        
-                        # 2. Atualizar estoque se marcado e se o produto já existir
-                        if atualizar_est and not df_estoque.empty and prod_compra in df_estoque['Produto'].values:
-                            item_e = df_estoque[df_estoque['Produto'] == prod_compra].iloc[0]
-                            novo_estoque_qtd = int(item_e['Quantidade']) + int(qtd_comprada)
-                            supabase.table("estoque").update({
-                                "quantidade": novo_estoque_qtd,
-                                "preco_custo": float(custo_unit_compra)
-                            }).eq("id", item_e['id']).execute()
-                        
-                        # 3. Lançar no financeiro se marcado
-                        if integrar_caixa:
-                            supabase.table("financeiro").insert({
-                                "data": data_str,
-                                "descricao": f"Compra estoque ({forn_selecionado}): {prod_compra} ({qtd_comprada} un)",
-                                "tipo": "Saída",
-                                "categoria": "Compra de Mercadoria / Estoque",
-                                "valor": float(vlr_total_compra)
-                            }).execute()
-                            
-                        st.success("✅ Pedido de compra registrado com sucesso!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao registrar pedido: {e}")
+                    st.success("Pedido de compra registrado com sucesso!")
+                    st.rerun()
         else:
-            st.info("Cadastre pelo menos um fornecedor na aba anterior antes de registrar pedidos de compra.")
+            st.info("Cadastre um fornecedor primeiro.")
 
-    with sub_forn_lista:
-        st.write("### 📋 Fornecedores Cadastrados")
+    with sub_f_hist:
         if not df_fornecedores.empty:
-            st.dataframe(df_fornecedores[['nome_empresa', 'cnpj', 'contato', 'telefone', 'email', 'observacoes']], hide_index=True)
+            st.dataframe(df_fornecedores[['nome_empresa', 'cnpj', 'telefone', 'email']], hide_index=True)
+        if not df_pedidos_compra.empty:
+            st.dataframe(df_pedidos_compra.style.format({'preco_custo_unitario': 'R$ {:.2f}', 'valor_total': 'R$ {:.2f}'}), hide_index=True)
+
+# ==========================================
+# 7. EMISSÃO DE ETIQUETAS DE CÓDIGO DE BARRAS (NOVO)
+# ==========================================
+with tab_etiquetas:
+    st.subheader("🏷️ Emissão de Etiquetas e Código de Barras")
+    st.write("Selecione um produto do estoque para gerar etiquetas de gôndola formatadas para impressão rápida.")
+    
+    if not df_estoque.empty:
+        col_e1, col_e2 = st.columns(2)
+        with col_e1:
+            prod_etq = st.selectbox("Selecione o Produto", df_estoque['Produto'].tolist())
+            qtd_etiquetas = st.number_input("Quantidade de Etiquetas a Gerar", min_value=1, max_value=100, value=10)
+        
+        item_etq = df_estoque[df_estoque['Produto'] == prod_etq].iloc[0]
+        preco_etq = item_etq['Valor Unitário']
+        cod_id = str(item_etq['id']).zfill(6) # Código base simulado por ID
+        
+        st.markdown("---")
+        st.write("### 🖨️ Pré-visualização da Etiqueta")
+        
+        # Criação de um bloco visual simulando etiquetas de gôndola
+        cols_preview = st.columns(3)
+        for i in range(min(3, qtd_etiquetas)):
+            with cols_preview[i]:
+                st.markdown(f"""
+                <div style="border: 2px dashed #333; padding: 15px; border-radius: 5px; text-align: center; background-color: #fff; color: #000;">
+                    <h4 style="margin:0; font-size: 16px;">{prod_etq}</h4>
+                    <p style="font-size: 12px; margin: 5px 0;">Cód: 789000{cod_id}</p>
+                    <h3 style="margin:0; color: #2e7d32;">R$ {preco_etq:.2f}</h3>
+                    <p style="font-size: 20px; font-family: monospace; letter-spacing: 2px; margin: 5px 0;">||| | |||| || |</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🖨️ Imprimir / Gerar Lote de Etiquetas (Abrir Janela de Impressão)"):
+            st.info(f"Geradas {qtd_etiquetas} etiquetas para o produto **{prod_etq}**. Pressione Ctrl+P no seu navegador para imprimir esta página.")
+    else:
+        st.info("Nenhum produto cadastrado no estoque para gerar etiquetas.")
+
+# ==========================================
+# 8. INTELIGÊNCIA DE VENDAS & CURVA ABC (NOVO)
+# ==========================================
+with tab_curva_abc:
+    st.subheader("📊 Inteligência de Vendas & Relatório Curva ABC")
+    st.write("Análise automatizada do faturamento por produto para classificar seu mix no padrão Curva ABC (A: Mais rentáveis/vendidos, B: Intermediários, C: Baixa saída).")
+    
+    if not df_vendas.empty:
+        # Agrupamento de vendas por produto
+        curva_df = df_vendas.groupby('Produto').agg(
+            Quantidade_Vendida=('Quantidade', 'sum'),
+            Faturamento_Total=('Valor Total', 'sum'),
+            Lucro_Total=('Lucro', 'sum')
+        ).reset_index().sort_values(by='Faturamento_Total', ascending=False)
+        
+        # Cálculo de participação percentual e acumulada
+        faturamento_geral = curva_df['Faturamento_Total'].sum()
+        if faturamento_geral > 0:
+            curva_df['Participacao_%'] = (curva_df['Faturamento_Total'] / faturamento_geral) * 100
+            curva_df['Acumulado_%'] = curva_df['Participacao_%'].cumsum()
+            
+            # Classificação ABC
+            def classificar_abc(acum):
+                if acum <= 80:
+                    return 'A (Até 80%)'
+                elif acum <= 95:
+                    return 'B (80% - 95%)'
+                else:
+                    return 'C (95% - 100%)'
+                    
+            curva_df['Curva ABC'] = curva_df['Acumulado_%'].apply(classificar_abc)
+            
+            # Exibição de Métricas Resumidas
+            c1, c2, c3 = st.columns(3)
+            c1.metric("📦 Total de Produtos Comercializados", len(curva_df))
+            c2.metric("💎 Faturamento Analisado", f"R$ {faturamento_geral:.2f}")
+            c3.metric("🏆 Produtos Classe A", len(curva_df[curva_df['Curva ABC'].str.startswith('A')]))
             
             st.markdown("---")
-            st.write("#### Excluir Fornecedor")
-            forn_para_apagar = st.selectbox("Selecione o fornecedor para remover:", df_fornecedores['nome_empresa'].tolist(), key="del_forn")
-            if st.button("🗑️ Remover Fornecedor Selecionado"):
+            st.dataframe(curva_df[['Curva ABC', 'Produto', 'Quantidade_Vendida', 'Faturamento_Total', 'Lucro_Total', 'Participacao_%']].style.format({
+                'Faturamento_Total': 'R$ {:.2f}', 
+                'Lucro_Total': 'R$ {:.2f}', 
+                'Participacao_%': '{:.2f}%'
+            }), hide_index=True)
+            
+            st.markdown("---")
+            st.write("### 📈 Gráfico de Participação no Faturamento (Curva ABC)")
+            st.altair_chart(
+                alt.Chart(curva_df).mark_bar(color='#4f46e5').encode(
+                    x=alt.X('Produto:N', sort='-y'),
+                    y=alt.Y('Faturamento_Total:Q', title='Faturamento (R$)'),
+                    color='Curva ABC:N',
+                    tooltip=['Produto', 'Faturamento_Total', 'Curva ABC']
+                ).properties(height=350),
+                use_container_width=True
+            )
+        else:
+            st.info("Faturamento total zerado.")
+    else:
+        st.info("Registre vendas no sistema para gerar a Inteligência de Vendas e Curva ABC.")
+
+# ==========================================
+# 9. FECHAMENTO DE CAIXA, SANGRIA E QUEBRA (NOVO)
+# ==========================================
+with tab_caixa:
+    st.subheader("💵 Fechamento de Caixa Diário, Sangria e Quebra")
+    st.write("Gerencie aberturas, retiradas seguras (sangria) e apuração de quebras de caixa por turno/dia.")
+    
+    sub_cx_lanc, sub_cx_rel = st.tabs(["➕ Operações de Caixa", "📋 Histórico de Caixa"])
+    
+    with sub_cx_lanc:
+        with st.form("form_operacao_caixa"):
+            c1, c2 = st.columns(2)
+            with c1:
+                tipo_op = st.selectbox("Tipo de Operação", ["Abertura de Caixa", "Sangria (Retirada de Dinheiro)", "Fechamento de Caixa com Apuração"])
+                resp = st.text_input("Operador / Responsável", value="Caixa Principal")
+            with c2:
+                vlr_op = st.number_input("Valor Envolvido (R$)", min_value=0.0, step=0.01)
+                data_op = st.date_input("Data da Operação", value=datetime.now())
+                
+            obs_op = st.text_area("Observações (Ex: Motivo da sangria, conferência de malote ou justificativa de quebra)")
+            
+            if st.form_submit_button("Registrar Operação de Caixa"):
+                dt_str = f"{data_op} {datetime.now().strftime('%H:%M:%S')}"
+                
+                # Mapeia para salvamento no banco
+                db_tipo = "Abertura" if "Abertura" in tipo_op else ("Sangria" if "Sangria" in tipo_op else "Fechamento")
+                
                 try:
-                    f_id = df_fornecedores[df_fornecedores['nome_empresa'] == forn_para_apagar].iloc[0]['id']
-                    supabase.table("fornecedores").delete().eq("id", f_id).execute()
-                    st.success("Fornecedor removido com sucesso!")
+                    supabase.table("fechamento_caixa").insert({
+                        "data": dt_str,
+                        "tipo_registro": db_tipo,
+                        "valor": float(vlr_op),
+                        "responsavel": resp,
+                        "observacao": obs_op
+                    }).execute()
+                    
+                    # Se for sangria, opcionalmente reflete no financeiro como saída de caixa físico
+                    if db_tipo == "Sangria":
+                        supabase.table("financeiro").insert({
+                            "data": dt_str,
+                            "descricao": f"Sangria de Caixa ({resp}): {obs_op}",
+                            "tipo": "Saída",
+                            "categoria": "Despesas Operacionais",
+                            "valor": float(vlr_op)
+                        }).execute()
+                        
+                    st.success(f"✅ Operação de '{db_tipo}' registrada com sucesso!")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Erro ao excluir fornecedor: {e}")
-        else:
-            st.info("Nenhum fornecedor cadastrado ainda.")
+                    st.error(f"Erro ao registrar operação: {e}")
+
+    with sub_cx_rel:
+        if not df_caixa.empty:
+            st.dataframe(df_caixa.style.format({'valor': 'R$ {:.2f}'}), hide_index=True)
             
-        st.markdown("---")
-        st.write("### 📦 Histórico de Pedidos de Compra")
-        if not df_pedidos_compra.empty:
-            st.dataframe(df_pedidos_compra[['id', 'data', 'fornecedor', 'produto', 'quantidade', 'preco_custo_unitario', 'valor_total', 'status']].style.format({'preco_custo_unitario': 'R$ {:.2f}', 'valor_total': 'R$ {:.2f}'}), hide_index=True)
+            st.markdown("---")
+            cx_del = st.selectbox("Remover registro incorreto:", df_caixa['id'].tolist(), key="del_cx")
+            if st.button("Apagar Registro de Caixa"):
+                supabase.table("fechamento_caixa").delete().eq("id", cx_del).execute()
+                st.success("Registro apagado!")
+                st.rerun()
         else:
-            st.info("Nenhum pedido de compra registrado.")
+            st.info("Nenhuma operação de caixa registrada.")
 
 # ==========================================
-# ABA 6: DASHBOARD & GRÁFICOS
+# 10. DASHBOARD GERAL
 # ==========================================
 with tab_dashboard:
-    st.subheader("📊 Dashboard Analítico e Monitoramento do Comércio")
-    
+    st.subheader("📊 Dashboard Geral do Sistema")
     dados_fin_dash = df_financeiro.copy()
-    
     if not dados_fin_dash.empty:
-        total_entradas_dash = dados_fin_dash[dados_fin_dash['Tipo'] == 'Entrada']['Valor'].sum()
-        total_saidas_dash = dados_fin_dash[dados_fin_dash['Tipo'] == 'Saída']['Valor'].sum()
-        resultado_liquido = total_entradas_dash - total_saidas_dash
+        ent = dados_fin_dash[dados_fin_dash['Tipo'] == 'Entrada']['Valor'].sum()
+        sai = dados_fin_dash[dados_fin_dash['Tipo'] == 'Saída']['Valor'].sum()
         
-        col_m1, col_m2, col_m3 = st.columns(3)
-        col_m1.metric("🟢 Total de Ganhos (Entradas)", f"R$ {total_entradas_dash:.2f}")
-        col_m2.metric("🔴 Total de Perdas/Despesas", f"R$ {total_saidas_dash:.2f}")
-        col_m3.metric("💼 Resultado Líquido", f"R$ {resultado_liquido:.2f}", delta=f"R$ {resultado_liquido:.2f}")
-        
-        st.markdown("---")
-        
-        col_g1, col_g2 = st.columns(2)
-        
-        with col_g1:
-            st.write("### 🥧 Distribuição de Entradas e Saídas (Gráfico de Pizza)")
-            resumo_tipo = dados_fin_dash.groupby('Tipo')['Valor'].sum()
-            if not resumo_tipo.empty:
-                st.altair_chart(
-                    alt.Chart(resumo_tipo.reset_index()).mark_arc(innerRadius=50).encode(
-                        theta=alt.Theta(field="Valor", type="quantitative"),
-                        color=alt.Color(field="Tipo", type="nominal", scale=alt.Scale(domain=['Entrada', 'Saída'], range=['#22c55e', '#ef4444'])),
-                        tooltip=['Tipo', 'Valor']
-                    ).properties(height=300),
-                    use_container_width=True
-                )
-            else:
-                st.info("Dados insuficientes para o gráfico de pizza.")
-
-        with col_g2:
-            st.write("### 🏷️ Despesas e Custos por Categoria")
-            saidas_dash = dados_fin_dash[dados_fin_dash['Tipo'] == 'Saída']
-            if not saidas_dash.empty:
-                resumo_cat = saidas_dash.groupby('Categoria')['Valor'].sum().reset_index()
-                st.altair_chart(
-                    alt.Chart(resumo_cat).mark_bar(color='#f97316').encode(
-                        x=alt.X('Categoria:N', sort='-y'),
-                        y=alt.Y('Valor:Q'),
-                        tooltip=['Categoria', 'Valor']
-                    ).properties(height=300),
-                    use_container_width=True
-                )
-            else:
-                st.info("Nenhuma despesa cadastrada para exibir o gráfico de categorias.")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Entradas Totais", f"R$ {ent:.2f}")
+        c2.metric("Saídas Totais", f"R$ {sai:.2f}")
+        c3.metric("Saldo Líquido", f"R$ {ent - sai:.2f}")
         
         st.markdown("---")
-        st.write("### 📈 Histórico Geral de Transações Monitoradas")
-        st.dataframe(dados_fin_dash[['Data', 'Tipo', 'Categoria', 'Descrição', 'Valor']].style.format({'Valor': 'R$ {:.2f}'}), hide_index=True)
-        
+        st.altair_chart(
+            alt.Chart(dados_fin_dash.groupby('Tipo')['Valor'].sum().reset_index()).mark_arc(innerRadius=50).encode(
+                theta='Valor:Q', color=alt.Color('Tipo:N', scale=alt.Scale(domain=['Entrada', 'Saída'], range=['#22c55e', '#ef4444'])),
+                tooltip=['Tipo', 'Valor']
+            ).properties(height=300),
+            use_container_width=True
+        )
     else:
-        st.info("Nenhum dado financeiro ou de vendas registrado ainda para gerar o dashboard analítico.")
+        st.info("Sem dados para o dashboard.")
