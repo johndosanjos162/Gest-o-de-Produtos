@@ -93,17 +93,17 @@ df_vendas = carregar_dados_tabela("vendas")
 df_financeiro = carregar_dados_tabela("financeiro")
 df_fornecedores = carregar_dados_tabela("fornecedores")
 
-# Normalização de colunas vazias caso o banco esteja vazio
+# Normalização de colunas vazias / suporte a colunas financeiras avançadas
 if df_estoque.empty:
     df_estoque = pd.DataFrame(columns=['id', 'produto', 'categoria', 'quantidade', 'limite_minimo', 'valor_unitario', 'preco_custo'])
 if df_vendas.empty:
     df_vendas = pd.DataFrame(columns=['id', 'data', 'produto', 'quantidade', 'valor_total', 'lucro'])
 if df_financeiro.empty:
-    df_financeiro = pd.DataFrame(columns=['id', 'data', 'descricao', 'tipo', 'valor'])
+    df_financeiro = pd.DataFrame(columns=['id', 'data', 'descricao', 'tipo', 'categoria', 'valor'])
 if df_fornecedores.empty:
     df_fornecedores = pd.DataFrame(columns=['id', 'nome', 'contato', 'categoria_produto'])
 
-# Padronizar nomes de colunas visualmente se necessário
+# Padronização de nomes de colunas visualmente
 if 'Produto' not in df_estoque.columns and 'produto' in df_estoque.columns:
     df_estoque = df_estoque.rename(columns={
         'produto': 'Produto',
@@ -134,8 +134,12 @@ if 'Data' not in df_financeiro.columns and 'data' in df_financeiro.columns:
         'data': 'Data',
         'descricao': 'Descrição',
         'tipo': 'Tipo',
+        'categoria': 'Categoria',
         'valor': 'Valor'
     })
+
+if 'Categoria' not in df_financeiro.columns:
+    df_financeiro['Categoria'] = 'Geral'
 
 if 'Nome' not in df_fornecedores.columns and 'nome' in df_fornecedores.columns:
     df_fornecedores = df_fornecedores.rename(columns={
@@ -150,7 +154,7 @@ if 'Nome' not in df_fornecedores.columns and 'nome' in df_fornecedores.columns:
 tab_estoque, tab_vendas, tab_financeiro, tab_fornecedores = st.tabs([
     "📦 Estoque", 
     "🛒 Vendas", 
-    "💰 Financeiro", 
+    "💰 Controle Financeiro Total", 
     "🤝 Fornecedores"
 ])
 
@@ -244,16 +248,13 @@ with tab_estoque:
     if not dados_est.empty:
         produtos_em_alerta = dados_est[dados_est['Quantidade'] <= dados_est['Limite Mínimo']]
         if not produtos_em_alerta.empty:
-            st.warning("⚠️️ **Atenção: Os seguintes produtos estão com estoque baixo!**")
+            st.warning("⚠ **Atenção: Os seguintes produtos estão com estoque baixo!**")
             for _, row in produtos_em_alerta.iterrows():
                 st.error(f"📉 **{row['Produto']}**: Restam apenas {row['Quantidade']} unidades (Limite: {row['Limite Mínimo']})")
         
-        # Cálculos de valor investido e valor de venda projetado
         dados_est['Valor Custo Total'] = dados_est['Quantidade'] * dados_est['Preço de Custo']
         dados_est['Valor Venda Total'] = dados_est['Quantidade'] * dados_est['Valor Unitário']
-        dados_est['Lucro Estimado Unitário'] = dados_est['Valor Unitário'] - dados_est['Preço de Custo']
         
-        # Métricas gerais de estoque no topo da tabela
         total_investido = dados_est['Valor Custo Total'].sum()
         total_projetado = dados_est['Valor Venda Total'].sum()
         lucro_potencial = total_projetado - total_investido
@@ -306,15 +307,16 @@ with tab_vendas:
                             "lucro": float(lucro_venda)
                         }).execute()
                         
-                        # Registra no financeiro (Entrada)
+                        # Registra automaticamente no Financeiro (Entrada - Receita de Vendas)
                         supabase.table("financeiro").insert({
                             "data": data_str,
-                            "descricao": f"Venda: {prod_venda}",
+                            "descricao": f"Venda: {prod_venda} ({qtd_venda} un)",
                             "tipo": "Entrada",
+                            "categoria": "Vendas de Produtos",
                             "valor": float(vlr_total)
                         }).execute()
                         
-                        st.success("Venda registrada com sucesso! Estoque, lucro e financeiro atualizados.")
+                        st.success("Venda registrada com sucesso! Estoque e Financeiro atualizados.")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Erro ao registrar venda: {e}")
@@ -353,17 +355,15 @@ with tab_vendas:
                 
                 if btn_cancelar_venda:
                     try:
-                        # Devolve quantidade ao estoque se o produto ainda existir
                         if not df_estoque.empty and old_prod in df_estoque['Produto'].values:
                             est_item = df_estoque[df_estoque['Produto'] == old_prod].iloc[0]
                             novo_qtd_est = int(est_item['Quantidade']) + old_qtd
                             supabase.table("estoque").update({"quantidade": novo_qtd_est}).eq("id", est_item['id']).execute()
                         
-                        # Remove a venda
                         supabase.table("vendas").delete().eq("id", venda_atual['id']).execute()
                         
-                        # Remove transação financeira correspondente
-                        fin_match = df_financeiro[(df_financeiro['Descrição'] == f"Venda: {old_prod}") & (df_financeiro['Valor'] == old_total)]
+                        # Remove transação financeira associada
+                        fin_match = df_financeiro[(df_financeiro['Descrição'].str.contains(old_prod)) & (df_financeiro['Valor'] == old_total)]
                         if not fin_match.empty:
                             supabase.table("financeiro").delete().eq("id", fin_match.iloc[0]['id']).execute()
                         
@@ -395,10 +395,10 @@ with tab_vendas:
                                 "lucro": float(novo_lucro)
                             }).eq("id", venda_atual['id']).execute()
                             
-                            fin_match = df_financeiro[(df_financeiro['Descrição'] == f"Venda: {old_prod}") & (df_financeiro['Valor'] == old_total)]
+                            fin_match = df_financeiro[(df_financeiro['Descrição'].str.contains(old_prod)) & (df_financeiro['Valor'] == old_total)]
                             if not fin_match.empty:
                                 supabase.table("financeiro").update({
-                                    "descricao": f"Venda: {novo_prod}",
+                                    "descricao": f"Venda: {novo_prod} ({nova_qtd} un)",
                                     "valor": float(novo_total)
                                 }).eq("id", fin_match.iloc[0]['id']).execute()
                                 
@@ -418,70 +418,114 @@ with tab_vendas:
         st.info("Nenhuma venda registrada ainda.")
 
 # ==========================================
-# ABA 3: FINANCEIRO
+# ABA 3: CONTROLE FINANCEIRO TOTAL
 # ==========================================
 with tab_financeiro:
-    st.subheader("💰 Controle Financeiro")
+    st.subheader("💰 Gestão Financeira Completa (Fluxo de Caixa)")
     
-    with st.expander("Registrar Transação Manual (Despesas etc.)"):
-        with st.form("form_fin"):
-            desc = st.text_input("Descrição (Ex: Conta de Luz, Material, Fornecedor)")
-            tipo = st.selectbox("Tipo", ["Entrada", "Saída"])
-            valor = st.number_input("Valor (R$)", min_value=0.01, step=0.01)
-            btn_fin = st.form_submit_button("Registrar Transação")
+    # Sub-abas para organizar o financeiro
+    fin_tab_lancamento, fin_tab_extrato, fin_tab_analise = st.tabs(["➕ Novo Lançamento", "📋 Extrato e Gestão", "📊 Relatórios e Indicadores"])
+    
+    with fin_tab_lancamento:
+        st.write("### Registrar Entrada ou Saída Manual")
+        with st.form("form_fin_total"):
+            c1, c2 = st.columns(2)
+            with c1:
+                tipo = st.selectbox("Tipo de Movimentação", ["Entrada", "Saída"])
+                desc = st.text_input("Descrição / Histórico (Ex: Aluguel, Conta de Luz, Aporte Sócio)")
+            with c2:
+                # Categorias inteligentes baseadas no tipo
+                if tipo == "Entrada":
+                    cat_fin = st.selectbox("Categoria", ["Vendas de Produtos", "Serviços Prestados", "Aporte de Capital", "Rendimentos / Juros", "Outras Entradas"])
+                else:
+                    cat_fin = st.selectbox("Categoria", ["Compra de Mercadoria / Estoque", "Despesas Operacionais (Água/Luz/Internet)", "Aluguel", "Salários / Pró-labore", "Impostos e Taxas", "Marketing e Publicidade", "Manutenção", "Outras Saídas"])
+                valor = st.number_input("Valor (R$)", min_value=0.01, step=0.01)
+                
+            data_lancamento = st.date_input("Data da Movimentação", value=datetime.now())
             
-            if btn_fin and desc:
+            btn_salvar_fin = st.form_submit_button("Salvar Lançamento Financeiro", use_container_width=True)
+            
+            if btn_salvar_fin and desc:
                 try:
+                    data_str = f"{data_lancamento} {datetime.now().strftime('%H:%M:%S')}"
                     supabase.table("financeiro").insert({
-                        "data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "descricao": desc,
+                        "data": data_str,
+                        "descricao": desc.strip(),
                         "tipo": tipo,
+                        "categoria": cat_fin,
                         "valor": float(valor)
                     }).execute()
-                    st.success("Transação registrada com sucesso no Supabase!")
+                    st.success("✅ Transação financeira registrada com sucesso na nuvem!")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Erro ao registrar transação: {e}")
+                    st.error(f"Erro ao salvar transação: {e}")
+
+    with fin_tab_extrato:
+        st.write("### Histórico e Exclusão de Lançamentos")
+        dados_fin = df_financeiro.copy()
+        
+        if not dados_fin.empty:
+            # Filtros do Extrato
+            col_f1, col_f2 = st.columns(2)
+            filtro_tipo = col_f1.selectbox("Filtrar por Tipo", ["Todos", "Entrada", "Saída"])
+            if filtro_tipo != "Todos":
+                dados_fin = dados_fin[dados_fin['Tipo'] == filtro_tipo]
                 
-    with st.expander("🗑️ Remover Transação Manual (Corrigir Erro)"):
-        st.warning("Nota: Para cancelar Vendas, use a aba de Vendas.")
-        if not df_financeiro.empty:
+            categorias_disponiveis = ["Todas"] + list(dados_fin['Categoria'].unique()) if 'Categoria' in dados_fin.columns else ["Todas"]
+            filtro_cat = col_f2.selectbox("Filtrar por Categoria", categorias_disponiveis)
+            if filtro_cat != "Todas":
+                dados_fin = dados_fin[dados_fin['Categoria'] == filtro_cat]
+
+            st.dataframe(dados_fin[['id', 'Data', 'Tipo', 'Categoria', 'Descrição', 'Valor']].style.format({'Valor': 'R$ {:.2f}'}), hide_index=True)
+            
+            st.markdown("---")
+            st.write("#### Excluir Lançamento Errado")
             opcoes_exclusao = []
-            for _, row in df_financeiro.iterrows():
-                texto = f"ID: {row['id']} | {row['Data']} | {row['Tipo']} | {row['Descrição']} | R$ {row['Valor']:.2f}"
+            for _, row in dados_fin.iterrows():
+                texto = f"ID: {row['id']} | {row['Data']} | [{row['Tipo']}] {row['Categoria']} - {row['Descrição']} | R$ {row['Valor']:.2f}"
                 opcoes_exclusao.append(texto)
                 
-            transacao_excluir = st.selectbox("Selecione a transação que deseja apagar:", opcoes_exclusao)
-            if st.button("Apagar Registro Selecionado"):
-                id_excluir = transacao_excluir.split("|")[0].replace("ID:", "").strip()
-                try:
-                    supabase.table("financeiro").delete().eq("id", id_excluir).execute()
-                    st.success("Transação apagada com sucesso!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro ao apagar: {e}")
+            if opcoes_exclusao:
+                transacao_excluir = st.selectbox("Selecione a transação para apagar:", opcoes_exclusao)
+                if st.button("🗑️ Apagar Lançamento Selecionado"):
+                    id_excluir = transacao_excluir.split("|")[0].replace("ID:", "").strip()
+                    try:
+                        supabase.table("financeiro").delete().eq("id", id_excluir).execute()
+                        st.success("Transação apagada com sucesso!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao apagar: {e}")
         else:
-            st.info("Não há transações financeiras para remover.")
+            st.info("Nenhuma transação financeira registrada.")
 
-    dados_fin = df_financeiro.copy()
-    if not dados_fin.empty:
-        entradas = dados_fin[dados_fin['Tipo'] == 'Entrada']['Valor'].sum()
-        saidas = dados_fin[dados_fin['Tipo'] == 'Saída']['Valor'].sum()
-        saldo = entradas - saidas
+    with fin_tab_analise:
+        st.write("### 📊 Indicadores e Resumo de Caixa")
+        dados_fin_completo = df_financeiro.copy()
         
-        # Lucro Total Acumulado das vendas
-        lucro_total_vendas = df_vendas['Lucro'].sum() if not df_vendas.empty else 0.0
-        
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Total Entradas", f"R$ {entradas:.2f}")
-        c2.metric("Total Saídas", f"R$ {saidas:.2f}")
-        c3.metric("Saldo Atual", f"R$ {saldo:.2f}")
-        c4.metric("📈 Lucro Total Vendas", f"R$ {lucro_total_vendas:.2f}")
-        
-        st.subheader("Extrato")
-        st.dataframe(dados_fin[['Data', 'Descrição', 'Tipo', 'Valor']].style.format({'Valor': 'R$ {:.2f}'}), hide_index=True)
-    else:
-        st.info("Nenhuma movimentação financeira registrada.")
+        if not dados_fin_completo.empty:
+            total_entradas = dados_fin_completo[dados_fin_completo['Tipo'] == 'Entrada']['Valor'].sum()
+            total_saidas = dados_fin_completo[dados_fin_completo['Tipo'] == 'Saída']['Valor'].sum()
+            saldo_caixa = total_entradas - total_saidas
+            
+            # Lucro real pelas vendas cadastradas
+            lucro_vendas = df_vendas['Lucro'].sum() if not df_vendas.empty else 0.0
+            
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("🟢 Total de Entradas", f"R$ {total_entradas:.2f}")
+            c2.metric("🔴 Total de Saídas (Despesas)", f"R$ {total_saidas:.2f}")
+            c3.metric("💰 Saldo Líquido em Caixa", f"R$ {saldo_caixa:.2f}", delta=f"R$ {saldo_caixa:.2f}")
+            c4.metric("📈 Lucro Bruto (Vendas)", f"R$ {lucro_vendas:.2f}")
+            
+            st.markdown("---")
+            st.write("#### Despesas por Categoria")
+            saidas_df = dados_fin_completo[dados_fin_completo['Tipo'] == 'Saída']
+            if not saidas_df.empty:
+                gasto_por_cat = saidas_df.groupby('Categoria')['Valor'].sum().reset_index()
+                st.dataframe(gasto_por_cat.style.format({'Valor': 'R$ {:.2f}'}), hide_index=True)
+            else:
+                st.info("Nenhuma saída/despesa registrada para detalhar por categoria.")
+        else:
+            st.info("Cadastre movimentações financeiras para visualizar os relatórios.")
 
 # ==========================================
 # ABA 4: FORNECEDORES
