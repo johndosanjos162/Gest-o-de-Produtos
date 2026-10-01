@@ -17,11 +17,9 @@ st.set_page_config(layout="wide", page_title="Sistema ERP Integrado", page_icon=
 
 st.markdown("""
 <style>
-    /* ===== Reset e tipografia ===== */
     html, body, [class*="css"] { font-family: 'Inter', 'Segoe UI', sans-serif; }
     .main { padding: 1.5rem 2rem; }
     
-    /* ===== Título ===== */
     .title-text {
         font-weight: 800;
         font-size: 2.4rem;
@@ -33,7 +31,6 @@ st.markdown("""
         letter-spacing: -0.5px;
     }
     
-    /* ===== Cards de métricas (KPI) ===== */
     div[data-testid="stMetric"] {
         background: #ffffff;
         border: 1px solid #e2e8f0;
@@ -50,7 +47,6 @@ st.markdown("""
     div[data-testid="stMetricLabel"] { font-size: 0.85rem; color: #64748b; font-weight: 600; }
     div[data-testid="stMetricValue"] { font-size: 1.6rem; color: #0f172a; font-weight: 700; }
     
-    /* ===== Abas ===== */
     .stTabs [data-baseweb="tab-list"] {
         gap: 4px;
         background-color: #f1f5f9;
@@ -71,7 +67,6 @@ st.markdown("""
         color: white !important;
     }
     
-    /* ===== Botões ===== */
     .stButton>button, .stDownloadButton>button {
         background: linear-gradient(135deg, #4f46e5, #6366f1);
         color: white;
@@ -87,7 +82,6 @@ st.markdown("""
         box-shadow: 0 6px 14px rgba(79,70,229,0.35);
     }
     
-    /* ===== Inputs ===== */
     .stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] {
         border-radius: 8px !important;
     }
@@ -132,10 +126,9 @@ st.markdown("""
         font-weight: 700 !important;
         color: #1e293b !important;
     }
-    /* ===== DataFrames ===== */
+    
     .dataframe { border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
     
-    /* ===== Formulários ===== */
     div[data-testid="stForm"] {
         background: #ffffff;
         border: 1px solid #e2e8f0;
@@ -144,7 +137,6 @@ st.markdown("""
         box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     }
     
-    /* ===== Sidebar ===== */
     section[data-testid="stSidebar"] {
         background: linear-gradient(180deg, #1e1b4b 0%, #312e81 100%);
     }
@@ -154,7 +146,6 @@ st.markdown("""
         border: 1px solid rgba(255,255,255,0.2);
     }
     
-    /* ===== Divider ===== */
     hr { border-color: #e2e8f0; }
 </style>
 """, unsafe_allow_html=True)
@@ -165,19 +156,12 @@ st.markdown("""
 PALETA = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 
 def tema_altair(chart):
-    """Aplica tema padronizado em qualquer gráfico Altair."""
     return chart.configure_view(
         strokeWidth=0
     ).configure_axis(
-        grid=True,
-        gridColor='#e2e8f0',
-        gridDash=[3, 3],
-        domain=False,
-        labelColor='#475569',
-        titleColor='#1e293b',
-        labelFontSize=11,
-        titleFontSize=12,
-        titleFontWeight='bold'
+        grid=True, gridColor='#e2e8f0', gridDash=[3, 3], domain=False,
+        labelColor='#475569', titleColor='#1e293b',
+        labelFontSize=11, titleFontSize=12, titleFontWeight='bold'
     ).configure_title(
         fontSize=14, fontWeight='bold', color='#1e293b', anchor='start'
     ).configure_legend(
@@ -187,7 +171,6 @@ def tema_altair(chart):
     )
 
 def secao(titulo, subtitulo=None):
-    """Cabeçalho de seção padronizado."""
     st.markdown(f"""
     <div style="border-left: 4px solid #4f46e5; padding-left: 1rem; margin: 1rem 0;">
         <h2 style="margin: 0; color: #1e293b; font-size: 1.5rem;">{titulo}</h2>
@@ -196,7 +179,6 @@ def secao(titulo, subtitulo=None):
     """, unsafe_allow_html=True)
 
 def empty_state(icone, mensagem, dica=None):
-    """Estado vazio estilizado."""
     st.markdown(f"""
     <div style="text-align:center; padding: 3rem 1rem; background:#f8fafc; 
                 border: 2px dashed #cbd5e1; border-radius: 12px;">
@@ -207,7 +189,6 @@ def empty_state(icone, mensagem, dica=None):
     """, unsafe_allow_html=True)
 
 def moeda(v):
-    """Formata valor monetário no padrão brasileiro."""
     try:
         return f"R$ {float(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     except:
@@ -233,6 +214,8 @@ except Exception as e:
 # ==========================================
 if 'autenticado' not in st.session_state:
     st.session_state.autenticado = False
+if 'tela_calculadora' not in st.session_state:
+    st.session_state.tela_calculadora = False
 
 def tela_login():
     col1, col2, col3 = st.columns([1, 1.2, 1])
@@ -256,26 +239,6 @@ if not st.session_state.autenticado:
     tela_login()
     st.stop()
 
-with st.sidebar:
-    st.markdown("""
-    <div style="text-align:center; padding: 1rem 0;">
-        <div style="font-size: 2.5rem;">📦</div>
-        <h2 style="color: white; margin: 0.3rem 0;">ERP Nuvem</h2>
-        <p style="color: #a5b4fc; margin: 0;">v2.0 • Supabase</p>
-    </div>
-    """, unsafe_allow_html=True)
-    st.markdown("---")
-    st.markdown("👤 **Administrador**")
-    st.caption(datetime.now().strftime("📅 %d/%m/%Y • %H:%M"))
-    st.markdown("---")
-    st.success("🟢 Supabase Conectado")
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🚪 Sair do Sistema", use_container_width=True):
-        st.session_state.autenticado = False
-        st.rerun()
-
-st.markdown('<p class="title-text">📦 Sistema ERP Integrado</p>', unsafe_allow_html=True)
-
 # ==========================================
 # FUNÇÕES DE BUSCA DO BANCO DE DADOS
 # ==========================================
@@ -289,7 +252,6 @@ def carregar_dados_tabela(nome_tabela):
     except Exception as e:
         return pd.DataFrame()
 
-# Carregamento inicial
 df_estoque = carregar_dados_tabela("estoque")
 df_vendas = carregar_dados_tabela("vendas")
 df_financeiro = carregar_dados_tabela("financeiro")
@@ -341,7 +303,6 @@ else:
 if df_clientes.empty:
     df_clientes = pd.DataFrame(columns=['id', 'nome', 'cpf_cnpj', 'telefone', 'email', 'endereco', 'observacoes'])
 
-# Garante colunas de apoio
 if 'Preço de Custo' not in df_estoque.columns: df_estoque['Preço de Custo'] = 0.00
 if 'Limite Mínimo' not in df_estoque.columns: df_estoque['Limite Mínimo'] = 0
 if 'Valor Unitário' not in df_estoque.columns: df_estoque['Valor Unitário'] = 0.00
@@ -352,7 +313,6 @@ if 'Quantidade' not in df_estoque.columns: df_estoque['Quantidade'] = 0
 # FUNÇÃO DE GERAÇÃO DE RELATÓRIO PDF
 # ==========================================
 def gerar_relatorio_pdf():
-    """Gera um PDF completo com todas as seções do ERP integrado ao Supabase."""
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=landscape(A4),
@@ -361,14 +321,10 @@ def gerar_relatorio_pdf():
     )
 
     styles = getSampleStyleSheet()
-    titulo_style = ParagraphStyle(
-        'Titulo', parent=styles['Heading1'], fontSize=18,
-        alignment=1, spaceAfter=10, textColor=colors.HexColor('#4f46e5')
-    )
-    sub_style = ParagraphStyle(
-        'Sub', parent=styles['Heading2'], fontSize=13,
-        spaceAfter=6, spaceBefore=10, textColor=colors.HexColor('#4338ca')
-    )
+    titulo_style = ParagraphStyle('Titulo', parent=styles['Heading1'], fontSize=18,
+        alignment=1, spaceAfter=10, textColor=colors.HexColor('#4f46e5'))
+    sub_style = ParagraphStyle('Sub', parent=styles['Heading2'], fontSize=13,
+        spaceAfter=6, spaceBefore=10, textColor=colors.HexColor('#4338ca'))
     normal = styles['Normal']
 
     elementos = []
@@ -377,40 +333,21 @@ def gerar_relatorio_pdf():
     elementos.append(Paragraph(f"Gerado em: {agora}", normal))
     elementos.append(Spacer(1, 0.5 * cm))
 
-    # ---------- 1. ESTOQUE ----------
     elementos.append(Paragraph("1. Estoque (com Custo Total e Venda Total)", sub_style))
     if not df_estoque.empty:
-        dados = [['Produto', 'Categoria', 'Qtd',
-                  'Preço Custo (R$)', 'Valor Unit. (R$)',
+        dados = [['Produto', 'Categoria', 'Qtd', 'Preço Custo (R$)', 'Valor Unit. (R$)',
                   'Valor Custo Total (R$)', 'Valor Venda Total (R$)']]
-        total_qtd = 0
-        total_custo = 0.0
-        total_venda = 0.0
-
+        total_qtd = 0; total_custo = 0.0; total_venda = 0.0
         for _, row in df_estoque.iterrows():
             q = int(pd.to_numeric(row['Quantidade'], errors='coerce') or 0)
             pc = float(pd.to_numeric(row['Preço de Custo'], errors='coerce') or 0)
             pv = float(pd.to_numeric(row['Valor Unitário'], errors='coerce') or 0)
-            vct = q * pc
-            vvt = q * pv
-            total_qtd += q
-            total_custo += vct
-            total_venda += vvt
-            dados.append([
-                str(row['Produto'])[:35],
-                str(row['Categoria'])[:20],
-                str(q),
-                f"{pc:.2f}",
-                f"{pv:.2f}",
-                f"{vct:.2f}",
-                f"{vvt:.2f}",
-            ])
-
-        dados.append([
-            'TOTAIS GERAIS', '', str(total_qtd), '', '',
-            f"R$ {total_custo:.2f}", f"R$ {total_venda:.2f}"
-        ])
-
+            vct = q * pc; vvt = q * pv
+            total_qtd += q; total_custo += vct; total_venda += vvt
+            dados.append([str(row['Produto'])[:35], str(row['Categoria'])[:20], str(q),
+                f"{pc:.2f}", f"{pv:.2f}", f"{vct:.2f}", f"{vvt:.2f}"])
+        dados.append(['TOTAIS GERAIS', '', str(total_qtd), '', '',
+            f"R$ {total_custo:.2f}", f"R$ {total_venda:.2f}"])
         t = Table(dados, repeatRows=1,
                   colWidths=[6*cm, 3.2*cm, 1.6*cm, 2.7*cm, 2.7*cm, 3.4*cm, 3.4*cm])
         t.setStyle(TableStyle([
@@ -426,37 +363,24 @@ def gerar_relatorio_pdf():
             ('SPAN', (0, -1), (1, -1)),
         ]))
         elementos.append(t)
-
         elementos.append(Spacer(1, 0.2 * cm))
         elementos.append(Paragraph(
-            f"<b>Resumo do Inventário:</b> "
-            f"Total de itens em estoque: <b>{total_qtd}</b> | "
+            f"<b>Resumo do Inventário:</b> Total de itens em estoque: <b>{total_qtd}</b> | "
             f"Capital Investido (Custo): <b>R$ {total_custo:.2f}</b> | "
             f"Potencial de Venda: <b>R$ {total_venda:.2f}</b> | "
-            f"Lucro Potencial: <b>R$ {total_venda - total_custo:.2f}</b>",
-            normal
-        ))
+            f"Lucro Potencial: <b>R$ {total_venda - total_custo:.2f}</b>", normal))
     else:
         elementos.append(Paragraph("Nenhum produto cadastrado no estoque.", normal))
     elementos.append(Spacer(1, 0.4 * cm))
 
-    # ---------- 2. VENDAS ----------
     elementos.append(Paragraph("2. Vendas", sub_style))
     if not df_vendas.empty:
         dados = [['ID', 'Data', 'Produto', 'Qtd', 'Valor Total (R$)', 'Lucro (R$)']]
         for _, row in df_vendas.iterrows():
-            dados.append([
-                str(row['id']),
-                str(row['Data'])[:19],
-                str(row['Produto'])[:35],
-                str(int(row['Quantidade'])),
-                f"{float(row['Valor Total']):.2f}",
-                f"{float(row['Lucro']):.2f}"
-            ])
-        total_fat = df_vendas['Valor Total'].sum()
-        total_luc = df_vendas['Lucro'].sum()
+            dados.append([str(row['id']), str(row['Data'])[:19], str(row['Produto'])[:35],
+                str(int(row['Quantidade'])), f"{float(row['Valor Total']):.2f}", f"{float(row['Lucro']):.2f}"])
+        total_fat = df_vendas['Valor Total'].sum(); total_luc = df_vendas['Lucro'].sum()
         dados.append(['', '', 'TOTAIS', '', f"R$ {total_fat:.2f}", f"R$ {total_luc:.2f}"])
-
         t = Table(dados, repeatRows=1)
         t.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4f46e5')),
@@ -474,23 +398,15 @@ def gerar_relatorio_pdf():
         elementos.append(Paragraph("Nenhuma venda registrada.", normal))
     elementos.append(Spacer(1, 0.4 * cm))
 
-    # ---------- 3. FINANCEIRO ----------
     elementos.append(Paragraph("3. Financeiro", sub_style))
     if not df_financeiro.empty:
         dados = [['ID', 'Data', 'Tipo', 'Categoria', 'Descrição', 'Valor (R$)']]
         for _, row in df_financeiro.iterrows():
-            dados.append([
-                str(row['id']),
-                str(row['Data'])[:19],
-                str(row['Tipo']),
-                str(row['Categoria'])[:25],
-                str(row['Descrição'])[:40],
-                f"{float(row['Valor']):.2f}"
-            ])
+            dados.append([str(row['id']), str(row['Data'])[:19], str(row['Tipo']),
+                str(row['Categoria'])[:25], str(row['Descrição'])[:40], f"{float(row['Valor']):.2f}"])
         ent = df_financeiro[df_financeiro['Tipo'] == 'Entrada']['Valor'].sum()
         sai = df_financeiro[df_financeiro['Tipo'] == 'Saída']['Valor'].sum()
         dados.append(['', '', '', '', f'Entradas: R$ {ent:.2f} | Saídas: R$ {sai:.2f} | Saldo: R$ {ent - sai:.2f}', ''])
-
         t = Table(dados, repeatRows=1)
         t.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4f46e5')),
@@ -508,18 +424,12 @@ def gerar_relatorio_pdf():
         elementos.append(Paragraph("Nenhum registro financeiro.", normal))
     elementos.append(Spacer(1, 0.4 * cm))
 
-    # ---------- 4. CLIENTES ----------
     elementos.append(Paragraph("4. Clientes", sub_style))
     if not df_clientes.empty:
         dados = [['Nome', 'CPF/CNPJ', 'Telefone', 'E-mail', 'Endereço']]
         for _, row in df_clientes.iterrows():
-            dados.append([
-                str(row['nome'])[:30],
-                str(row['cpf_cnpj'] or ''),
-                str(row['telefone'] or ''),
-                str(row['email'] or '')[:30],
-                str(row['endereco'] or '')[:35]
-            ])
+            dados.append([str(row['nome'])[:30], str(row['cpf_cnpj'] or ''),
+                str(row['telefone'] or ''), str(row['email'] or '')[:30], str(row['endereco'] or '')[:35]])
         t = Table(dados, repeatRows=1)
         t.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4f46e5')),
@@ -537,13 +447,295 @@ def gerar_relatorio_pdf():
     return buffer.getvalue()
 
 # ==========================================
-# ABAS PRINCIPAIS DO ERP
+# SIDEBAR (sempre visível)
 # ==========================================
-tab_estoque, tab_planilhas_prod, tab_vendas, tab_calculadora, tab_despesas, tab_financeiro, tab_clientes, tab_dashboard, tab_relatorio = st.tabs([
+with st.sidebar:
+    st.markdown("""
+    <div style="text-align:center; padding: 1rem 0;">
+        <div style="font-size: 2.5rem;">📦</div>
+        <h2 style="color: white; margin: 0.3rem 0;">ERP Nuvem</h2>
+        <p style="color: #a5b4fc; margin: 0;">v2.0 • Supabase</p>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown("---")
+    st.markdown("👤 **Administrador**")
+    st.caption(datetime.now().strftime("📅 %d/%m/%Y • %H:%M"))
+    st.markdown("---")
+
+    # Botão de acesso rápido à Calculadora
+    if not st.session_state.tela_calculadora:
+        if st.button("🧮 Abrir Calculadora", use_container_width=True, type="primary"):
+            st.session_state.tela_calculadora = True
+            st.rerun()
+    else:
+        if st.button("⬅️ Voltar ao ERP", use_container_width=True):
+            st.session_state.tela_calculadora = False
+            st.rerun()
+
+    st.markdown("---")
+    st.success("🟢 Supabase Conectado")
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("🚪 Sair do Sistema", use_container_width=True):
+        st.session_state.autenticado = False
+        st.session_state.tela_calculadora = False
+        st.rerun()
+
+# ==========================================
+# 🌟 TELA DEDICADA DA CALCULADORA
+# ==========================================
+if st.session_state.tela_calculadora:
+    # Cabeçalho próprio
+    st.markdown("""
+    <div style="text-align: center; margin-bottom: 1.5rem;">
+        <div style="font-size: 4rem;">🧮</div>
+        <h1 style="
+            font-weight: 800;
+            font-size: 2.6rem;
+            background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 0.3rem 0;
+            letter-spacing: -0.5px;
+        ">Calculadora de Venda & Troco</h1>
+        <p style="color: #64748b; font-size: 1rem;">Monte o carrinho, edite quantidades, remova itens e informe o valor recebido</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Botão voltar no topo (grande e destacado)
+    col_voltar_1, col_voltar_2, col_voltar_3 = st.columns([1, 2, 1])
+    with col_voltar_2:
+        if st.button("⬅️ Voltar ao Sistema ERP", use_container_width=True):
+            st.session_state.tela_calculadora = False
+            st.rerun()
+
+    st.markdown("---")
+
+    if df_estoque.empty or 'Produto' not in df_estoque.columns:
+        empty_state("🧮", "Nenhum produto cadastrado", "Volte ao ERP e cadastre produtos no estoque primeiro")
+    else:
+        if 'carrinho' not in st.session_state:
+            st.session_state.carrinho = []
+        if 'cart_ver' not in st.session_state:
+            st.session_state.cart_ver = 0
+
+        # -------- ADICIONAR PRODUTOS --------
+        st.markdown("#### ➕ Adicionar produtos ao carrinho")
+        ca, cb, cc = st.columns([3, 1, 1])
+        with ca:
+            prod_add = st.selectbox("Produto:", df_estoque['Produto'].tolist(), key="cart_prod")
+        with cb:
+            qtd_add = st.number_input("Qtd:", min_value=1, value=1, step=1, key="cart_qtd")
+        with cc:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("➕ Adicionar", use_container_width=True):
+                item_add = df_estoque[df_estoque['Produto'] == prod_add].iloc[0]
+                ja_existe = next((x for x in st.session_state.carrinho if x['id'] == int(item_add['id'])), None)
+                if ja_existe:
+                    ja_existe['quantidade'] += int(qtd_add)
+                else:
+                    st.session_state.carrinho.append({
+                        'id': int(item_add['id']),
+                        'produto': prod_add,
+                        'preco': float(item_add['Valor Unitário']),
+                        'custo': float(item_add['Preço de Custo']),
+                        'quantidade': int(qtd_add),
+                        'estoque': int(item_add['Quantidade'])
+                    })
+                st.session_state.cart_ver += 1
+                st.toast(f"✅ {qtd_add}x {prod_add} adicionado!", icon="🛒")
+                st.rerun()
+
+        st.markdown("---")
+
+        if st.session_state.carrinho:
+            st.markdown("#### 🛒 Itens no Carrinho")
+            st.caption("✏️ Edite a quantidade diretamente na tabela. Use a seção abaixo para remover um item.")
+
+            # -------- TABELA EDITÁVEL --------
+            df_view = pd.DataFrame(st.session_state.carrinho)
+            df_view['Subtotal'] = df_view['preco'] * df_view['quantidade']
+            df_view = df_view[['produto', 'quantidade', 'preco', 'Subtotal']].rename(columns={
+                'produto': 'Produto', 'quantidade': 'Qtd', 'preco': 'Preço Unit.'
+            })
+
+            edited = st.data_editor(
+                df_view,
+                column_config={
+                    "Produto": st.column_config.TextColumn("Produto", disabled=True, width="large"),
+                    "Qtd": st.column_config.NumberColumn("Qtd (editável)", min_value=1, step=1, required=True, width="small"),
+                    "Preço Unit.": st.column_config.NumberColumn("Preço Unit.", format="R$ %.2f", disabled=True, width="small"),
+                    "Subtotal": st.column_config.NumberColumn("Subtotal", format="R$ %.2f", disabled=True, width="small"),
+                },
+                hide_index=True,
+                use_container_width=True,
+                key=f"editor_cart_{st.session_state.cart_ver}",
+                num_rows="fixed"
+            )
+
+            # Sincroniza alterações de quantidade
+            mudou = False
+            for i in range(len(st.session_state.carrinho)):
+                try:
+                    nova_q = int(edited.iloc[i]['Qtd'])
+                    estoque_disp = st.session_state.carrinho[i]['estoque']
+                    if nova_q < 1:
+                        nova_q = 1
+                    if nova_q > estoque_disp:
+                        st.warning(f"⚠️ Quantidade de **{st.session_state.carrinho[i]['produto']}** limitada ao estoque disponível ({estoque_disp} un).")
+                        nova_q = estoque_disp
+                    if nova_q != st.session_state.carrinho[i]['quantidade']:
+                        st.session_state.carrinho[i]['quantidade'] = nova_q
+                        mudou = True
+                except Exception:
+                    pass
+
+            if mudou:
+                st.session_state.cart_ver += 1
+                st.rerun()
+
+            # -------- REMOVER ITEM --------
+            st.markdown("##### 🗑️ Remover item do carrinho")
+            col_rem1, col_rem2 = st.columns([3, 1])
+            with col_rem1:
+                opcoes_rem = [
+                    f"{it['produto']} — {it['quantidade']} un × {moeda(it['preco'])} = {moeda(it['preco'] * it['quantidade'])}"
+                    for it in st.session_state.carrinho
+                ]
+                sel_rem = st.selectbox(
+                    "Selecione o item que deseja remover:",
+                    ["— Selecione um item —"] + opcoes_rem,
+                    key="sel_remover",
+                    label_visibility="collapsed"
+                )
+            with col_rem2:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("🗑️ Remover Item", use_container_width=True, disabled=(sel_rem == "— Selecione um item —")):
+                    idx_rem = opcoes_rem.index(sel_rem)
+                    removido = st.session_state.carrinho.pop(idx_rem)
+                    st.session_state.cart_ver += 1
+                    st.toast(f"🗑️ {removido['produto']} removido do carrinho!", icon="🗑️")
+                    st.rerun()
+
+            # -------- TOTAL E LIMPEZA --------
+            st.markdown("---")
+            df_carrinho = pd.DataFrame(st.session_state.carrinho)
+            df_carrinho['Subtotal'] = df_carrinho['preco'] * df_carrinho['quantidade']
+            total_carrinho = df_carrinho['Subtotal'].sum()
+
+            cd1, cd2, cd3 = st.columns(3)
+            cd1.metric("🛍 Itens", f"{df_carrinho['quantidade'].sum()} un")
+            cd2.metric("💰 Total do Carrinho", moeda(total_carrinho))
+            with cd3:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("🧹 Limpar Carrinho Inteiro", use_container_width=True):
+                    st.session_state.carrinho = []
+                    st.session_state.cart_ver += 1
+                    st.rerun()
+
+            # -------- PAGAMENTO --------
+            st.markdown("---")
+            st.markdown("#### 💵 Pagamento do Cliente")
+
+            cp1, cp2 = st.columns([1.3, 1])
+
+            with cp1:
+                valor_pago_carrinho = st.number_input(
+                    "💵 Valor recebido (R$):",
+                    min_value=0.0, step=0.50,
+                    value=float(total_carrinho),
+                    key="valor_cart",
+                    format="%.2f"
+                )
+
+            with cp2:
+                troco_carrinho = round(valor_pago_carrinho - total_carrinho, 2)
+
+                if troco_carrinho >= 0:
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #10b981, #059669); color:white; padding:1.6rem 1rem; border-radius:16px; text-align:center; min-height: 145px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 10px 25px rgba(16,185,129,0.35), 0 4px 10px rgba(0,0,0,0.08);">
+                        <p style="margin:0; font-size:0.9rem; opacity:0.95; letter-spacing:1.5px; font-weight:600;">🪙 TROCO</p>
+                        <h1 style="margin:0.3rem 0; font-size:2.8rem; font-weight:800; letter-spacing:-0.5px;">{moeda(troco_carrinho)}</h1>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    falta = abs(troco_carrinho)
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(135deg, #ef4444, #dc2626); color:white; padding:1.6rem 1rem; border-radius:16px; text-align:center; min-height: 145px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 10px 25px rgba(239,68,68,0.35), 0 4px 10px rgba(0,0,0,0.08);">
+                        <p style="margin:0; font-size:0.9rem; opacity:0.95; letter-spacing:1.5px; font-weight:600;">⚠️ FALTA PAGAR</p>
+                        <h1 style="margin:0.3rem 0; font-size:2.8rem; font-weight:800; letter-spacing:-0.5px;">{moeda(falta)}</h1>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+            # Verifica estoque
+            erros_estoque = [
+                item for item in st.session_state.carrinho
+                if item['quantidade'] > item['estoque']
+            ]
+            if erros_estoque:
+                for it in erros_estoque:
+                    st.error(f"❌ Estoque insuficiente: **{it['produto']}** — disponível: {it['estoque']}, pedido: {it['quantidade']}")
+
+            st.markdown("---")
+            col_btn1, col_btn2 = st.columns([1, 1])
+            with col_btn1:
+                if st.button("✅ Registrar Venda Completa", type="primary", use_container_width=True, disabled=bool(erros_estoque)):
+                    if valor_pago_carrinho < total_carrinho:
+                        st.error("⛔ Valor recebido menor que o total. Não é possível registrar.")
+                    else:
+                        try:
+                            data_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            for it in st.session_state.carrinho:
+                                vlr_t = it['preco'] * it['quantidade']
+                                lucro_v = (it['preco'] - it['custo']) * it['quantidade']
+                                supabase.table("estoque").update({
+                                    "quantidade": it['estoque'] - it['quantidade']
+                                }).eq("id", it['id']).execute()
+                                supabase.table("vendas").insert({
+                                    "data": data_str, "produto": it['produto'],
+                                    "quantidade": int(it['quantidade']),
+                                    "valor_total": float(vlr_t), "lucro": float(lucro_v)
+                                }).execute()
+                                supabase.table("financeiro").insert({
+                                    "data": data_str,
+                                    "descricao": f"Venda (Carrinho): {it['produto']} ({it['quantidade']} un)",
+                                    "tipo": "Entrada", "categoria": "Vendas de Produtos",
+                                    "valor": float(vlr_t)
+                                }).execute()
+                            troco_final = valor_pago_carrinho - total_carrinho
+                            st.success(f"✅ Venda de {len(st.session_state.carrinho)} item(ns) registrada! Troco: **{moeda(troco_final)}**")
+                            st.balloons()
+                            st.session_state.carrinho = []
+                            st.session_state.cart_ver += 1
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao registrar venda: {e}")
+            with col_btn2:
+                if st.button("🧹 Cancelar e Limpar", use_container_width=True):
+                    st.session_state.carrinho = []
+                    st.session_state.cart_ver += 1
+                    st.rerun()
+        else:
+            empty_state("🛒", "Carrinho vazio", "Adicione produtos acima para começar a venda")
+
+    st.markdown("---")
+    st.markdown("""
+    <div style="text-align: center; color: #94a3b8; font-size: 0.85rem; padding: 1rem 0;">
+        🧮 Calculadora de Venda & Troco • Modo Balcão
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Encerra aqui — não renderiza o resto do ERP
+    st.stop()
+
+# ==========================================
+# ABAS PRINCIPAIS DO ERP (sem a Calculadora)
+# ==========================================
+st.markdown('<p class="title-text">📦 Sistema ERP Integrado</p>', unsafe_allow_html=True)
+
+tab_estoque, tab_planilhas_prod, tab_vendas, tab_despesas, tab_financeiro, tab_clientes, tab_dashboard, tab_relatorio = st.tabs([
     "📦 Estoque", 
     "📑 Fichas por Produto",
     "🛒 Vendas", 
-    "🧮 Calculadora & Troco",
     "💡 Despesas",
     "💰 Financeiro", 
     "👥 Clientes",
@@ -557,7 +749,6 @@ tab_estoque, tab_planilhas_prod, tab_vendas, tab_calculadora, tab_despesas, tab_
 with tab_estoque:
     secao("📦 Gestão de Estoque", "Controle de produtos, custo e potencial de venda")
     
-    # Alerta de estoque baixo
     if not df_estoque.empty and 'Quantidade' in df_estoque.columns and 'Limite Mínimo' in df_estoque.columns:
         criticos = df_estoque[df_estoque['Quantidade'] <= df_estoque['Limite Mínimo']]
         if not criticos.empty:
@@ -567,7 +758,6 @@ with tab_estoque:
     if not df_estoque.empty and 'Quantidade' in df_estoque.columns and 'Preço de Custo' in df_estoque.columns:
         total_investido_custo = (df_estoque['Quantidade'] * df_estoque['Preço de Custo']).sum()
         total_valor_venda = (df_estoque['Quantidade'] * df_estoque['Valor Unitário']).sum()
-        
         c_m1, c_m2, c_m3 = st.columns(3)
         c_m1.metric("💰 Capital Investido (Custo)", moeda(total_investido_custo))
         c_m2.metric("🏷 Valor Potencial de Venda", moeda(total_valor_venda))
@@ -645,9 +835,7 @@ with tab_planilhas_prod:
     
     if not df_estoque.empty and 'Produto' in df_estoque.columns:
         produto_escolhido = st.selectbox("Escolha o produto:", df_estoque['Produto'].tolist(), key="sel_ficha_prod")
-        
         p_info = df_estoque[df_estoque['Produto'] == produto_escolhido].iloc[0]
-        
         qtd_atual = int(p_info['Quantidade'])
         preco_mercado = float(p_info['Preço de Custo'])
         preco_revenda_atual = float(p_info['Valor Unitário'])
@@ -692,22 +880,15 @@ with tab_planilhas_prod:
                 custo_q = q * preco_mercado
                 lucro_q = fat_q - custo_q
                 simulacao_dados.append({
-                    "Quantidade": q,
-                    "Preço de Mercado (Unit.)": preco_mercado,
+                    "Quantidade": q, "Preço de Mercado (Unit.)": preco_mercado,
                     "Preço de Revenda (Unit.)": novo_preco_revenda,
-                    "Faturamento Total": fat_q,
-                    "Custo Total": custo_q,
-                    "Lucro Líquido": lucro_q
+                    "Faturamento Total": fat_q, "Custo Total": custo_q, "Lucro Líquido": lucro_q
                 })
         df_simulacao = pd.DataFrame(simulacao_dados).drop_duplicates(subset=['Quantidade'])
         st.dataframe(df_simulacao.style.format({
-            'Preço de Mercado (Unit.)': 'R$ {:.2f}',
-            'Preço de Revenda (Unit.)': 'R$ {:.2f}',
-            'Faturamento Total': 'R$ {:.2f}',
-            'Custo Total': 'R$ {:.2f}',
-            'Lucro Líquido': 'R$ {:.2f}'
+            'Preço de Mercado (Unit.)': 'R$ {:.2f}', 'Preço de Revenda (Unit.)': 'R$ {:.2f}',
+            'Faturamento Total': 'R$ {:.2f}', 'Custo Total': 'R$ {:.2f}', 'Lucro Líquido': 'R$ {:.2f}'
         }), hide_index=True, use_container_width=True)
-        
     else:
         empty_state("📑", "Sem produtos cadastrados", "Cadastre produtos no estoque para visualizar as fichas individuais")
 
@@ -732,12 +913,10 @@ with tab_vendas:
             if not df_estoque.empty and 'Produto' in df_estoque.columns:
                 prod_venda = st.selectbox("Produto Vendido", df_estoque['Produto'].tolist())
                 qtd_venda = st.number_input("Quantidade", min_value=1, step=1)
-                
                 item_est_preview = df_estoque[df_estoque['Produto'] == prod_venda].iloc[0]
                 p_unit = float(item_est_preview['Valor Unitário'])
                 c_unit = float(item_est_preview['Preço de Custo'])
                 est_atual = int(item_est_preview['Quantidade'])
-                
                 st.info(f"💡 **Prévia:** Revenda Unit.: {moeda(p_unit)} | Custo Unit.: {moeda(c_unit)} | Lucro Unit.: {moeda(p_unit - c_unit)}")
                 
                 if st.form_submit_button("Confirmar e Registrar Venda", use_container_width=True):
@@ -745,11 +924,9 @@ with tab_vendas:
                         vlr_total = qtd_venda * p_unit
                         lucro_venda = (p_unit - c_unit) * qtd_venda
                         data_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        
                         supabase.table("estoque").update({"quantidade": est_atual - qtd_venda}).eq("id", int(item_est_preview['id'])).execute()
                         supabase.table("vendas").insert({"data": data_str, "produto": prod_venda, "quantidade": int(qtd_venda), "valor_total": float(vlr_total), "lucro": float(lucro_venda)}).execute()
                         supabase.table("financeiro").insert({"data": data_str, "descricao": f"Venda: {prod_venda} ({qtd_venda} un)", "tipo": "Entrada", "categoria": "Vendas de Produtos", "valor": float(vlr_total)}).execute()
-                        
                         st.success(f"✅ Venda registrada! Lucro obtido: {moeda(lucro_venda)}")
                         st.rerun()
                     else:
@@ -771,160 +948,7 @@ with tab_vendas:
             empty_state("🛒", "Nenhuma venda registrada", "Registre sua primeira venda na aba acima")
 
 # ==========================================
-# 4. CALCULADORA DE VENDA & TROCO (CARRINHO MULTI-ITENS)
-# ==========================================
-with tab_calculadora:
-    secao("🧮 Calculadora de Venda & Troco", "Monte o carrinho, informe o valor recebido e veja o troco")
-
-    if df_estoque.empty or 'Produto' not in df_estoque.columns:
-        empty_state("🧮", "Nenhum produto cadastrado", "Cadastre produtos no estoque primeiro")
-    else:
-        if 'carrinho' not in st.session_state:
-            st.session_state.carrinho = []
-
-        st.markdown("#### ➕ Adicionar produtos ao carrinho")
-        ca, cb, cc = st.columns([3, 1, 1])
-        with ca:
-            prod_add = st.selectbox("Produto:", df_estoque['Produto'].tolist(), key="cart_prod")
-        with cb:
-            qtd_add = st.number_input("Qtd:", min_value=1, value=1, step=1, key="cart_qtd")
-        with cc:
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("➕ Adicionar", use_container_width=True):
-                item_add = df_estoque[df_estoque['Produto'] == prod_add].iloc[0]
-                ja_existe = next((x for x in st.session_state.carrinho if x['id'] == int(item_add['id'])), None)
-                if ja_existe:
-                    ja_existe['quantidade'] += int(qtd_add)
-                else:
-                    st.session_state.carrinho.append({
-                        'id': int(item_add['id']),
-                        'produto': prod_add,
-                        'preco': float(item_add['Valor Unitário']),
-                        'custo': float(item_add['Preço de Custo']),
-                        'quantidade': int(qtd_add),
-                        'estoque': int(item_add['Quantidade'])
-                    })
-                st.toast(f"✅ {qtd_add}x {prod_add} adicionado!", icon="🛒")
-                st.rerun()
-
-        st.markdown("---")
-
-        if st.session_state.carrinho:
-            st.markdown("#### 🛒 Itens no Carrinho")
-
-            df_carrinho = pd.DataFrame(st.session_state.carrinho)
-            df_carrinho['Subtotal'] = df_carrinho['preco'] * df_carrinho['quantidade']
-
-            st.dataframe(
-                df_carrinho[['produto', 'quantidade', 'preco', 'Subtotal']].rename(columns={
-                    'produto': 'Produto', 'quantidade': 'Qtd',
-                    'preco': 'Preço Unit.', 'Subtotal': 'Subtotal'
-                }).style.format({'Preço Unit.': 'R$ {:.2f}', 'Subtotal': 'R$ {:.2f}'}),
-                hide_index=True, use_container_width=True
-            )
-
-            total_carrinho = df_carrinho['Subtotal'].sum()
-
-            cd1, cd2, cd3 = st.columns(3)
-            cd1.metric("🛍 Itens", f"{df_carrinho['quantidade'].sum()} un")
-            cd2.metric("💰 Total do Carrinho", moeda(total_carrinho))
-            with cd3:
-                st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("🗑️ Limpar Carrinho", use_container_width=True):
-                    st.session_state.carrinho = []
-                    st.rerun()
-
-            st.markdown("---")
-            st.markdown("#### 💵 Pagamento do Cliente")
-
-            # ============================================================
-            # CAMPOS DE PAGAMENTO — VALOR RECEBIDO (GRANDE) + TROCO (CARD)
-            # ============================================================
-            cp1, cp2 = st.columns([1.3, 1])
-
-            with cp1:
-                valor_pago_carrinho = st.number_input(
-                    "💵 Valor recebido (R$):",
-                    min_value=0.0, step=0.50,
-                    value=float(total_carrinho),
-                    key="valor_cart",
-                    format="%.2f"
-                )
-
-            with cp2:
-                troco_carrinho = round(valor_pago_carrinho - total_carrinho, 2)
-
-                if troco_carrinho >= 0:
-                    st.markdown(f"""
-                    <div style="background: linear-gradient(135deg, #10b981, #059669); color:white; padding:1.6rem 1rem; border-radius:16px; text-align:center; min-height: 145px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 10px 25px rgba(16,185,129,0.35), 0 4px 10px rgba(0,0,0,0.08);">
-                        <p style="margin:0; font-size:0.9rem; opacity:0.95; letter-spacing:1.5px; font-weight:600;">🪙 TROCO</p>
-                        <h1 style="margin:0.3rem 0; font-size:2.8rem; font-weight:800; letter-spacing:-0.5px;">{moeda(troco_carrinho)}</h1>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    falta = abs(troco_carrinho)
-                    st.markdown(f"""
-                    <div style="background: linear-gradient(135deg, #ef4444, #dc2626); color:white; padding:1.6rem 1rem; border-radius:16px; text-align:center; min-height: 145px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 10px 25px rgba(239,68,68,0.35), 0 4px 10px rgba(0,0,0,0.08);">
-                        <p style="margin:0; font-size:0.9rem; opacity:0.95; letter-spacing:1.5px; font-weight:600;">⚠️ FALTA PAGAR</p>
-                        <h1 style="margin:0.3rem 0; font-size:2.8rem; font-weight:800; letter-spacing:-0.5px;">{moeda(falta)}</h1>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-            # Verificar estoque
-            erros_estoque = [
-                item for item in st.session_state.carrinho
-                if item['quantidade'] > item['estoque']
-            ]
-            if erros_estoque:
-                for it in erros_estoque:
-                    st.error(f"❌ Estoque insuficiente: **{it['produto']}** — disponível: {it['estoque']}, pedido: {it['quantidade']}")
-
-            st.markdown("---")
-            col_btn1, col_btn2 = st.columns([1, 1])
-            with col_btn1:
-                if st.button("✅ Registrar Venda Completa", type="primary", use_container_width=True, disabled=bool(erros_estoque)):
-                    if valor_pago_carrinho < total_carrinho:
-                        st.error("⛔ Valor recebido menor que o total. Não é possível registrar.")
-                    else:
-                        try:
-                            data_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                            for it in st.session_state.carrinho:
-                                vlr_t = it['preco'] * it['quantidade']
-                                lucro_v = (it['preco'] - it['custo']) * it['quantidade']
-
-                                supabase.table("estoque").update({
-                                    "quantidade": it['estoque'] - it['quantidade']
-                                }).eq("id", it['id']).execute()
-
-                                supabase.table("vendas").insert({
-                                    "data": data_str, "produto": it['produto'],
-                                    "quantidade": int(it['quantidade']),
-                                    "valor_total": float(vlr_t), "lucro": float(lucro_v)
-                                }).execute()
-
-                                supabase.table("financeiro").insert({
-                                    "data": data_str,
-                                    "descricao": f"Venda (Carrinho): {it['produto']} ({it['quantidade']} un)",
-                                    "tipo": "Entrada", "categoria": "Vendas de Produtos",
-                                    "valor": float(vlr_t)
-                                }).execute()
-
-                            troco_final = valor_pago_carrinho - total_carrinho
-                            st.success(f"✅ Venda de {len(st.session_state.carrinho)} item(ns) registrada! Troco: **{moeda(troco_final)}**")
-                            st.balloons()
-                            st.session_state.carrinho = []
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Erro ao registrar venda: {e}")
-            with col_btn2:
-                if st.button("🧹 Cancelar e Limpar", use_container_width=True):
-                    st.session_state.carrinho = []
-                    st.rerun()
-        else:
-            empty_state("🛒", "Carrinho vazio", "Adicione produtos acima para começar a venda")
-
-# ==========================================
-# 5. DESPESAS
+# 4. DESPESAS
 # ==========================================
 with tab_despesas:
     secao("💡 Despesas do Comércio", "Lançamento e gestão de custos operacionais")
@@ -939,7 +963,6 @@ with tab_despesas:
             with c2:
                 vlr_d = st.number_input("Valor (R$)", min_value=0.01, step=0.01)
                 data_d = st.date_input("Data", value=datetime.now())
-                
             if st.form_submit_button("Lançar Despesa", use_container_width=True):
                 supabase.table("financeiro").insert({
                     "data": f"{data_d} {datetime.now().strftime('%H:%M:%S')}",
@@ -963,7 +986,7 @@ with tab_despesas:
             empty_state("💡", "Nenhuma despesa lançada", "Comece lançando sua primeira despesa na aba acima")
 
 # ==========================================
-# 6. FINANCEIRO
+# 5. FINANCEIRO
 # ==========================================
 with tab_financeiro:
     secao("💰 Fluxo de Caixa", "Visualização completa de entradas, saídas e saldo")
@@ -984,15 +1007,12 @@ with tab_financeiro:
         try:
             res_fin = supabase.table("financeiro").select("id, data, descricao, valor, tipo").order("id", desc=True).execute()
             dados_financeiros = res_fin.data
-            
             if dados_financeiros:
                 opcoes_fin = {
                     f"ID: {item['id']} | Data: {item['data']} | Desc: {item['descricao']} | R$ {item['valor']} ({item['tipo']})": item['id']
                     for item in dados_financeiros
                 }
-                
                 selecao_fin_str = st.selectbox("Selecione o registro para excluir:", list(opcoes_fin.keys()), key="select_del_financeiro")
-                
                 if st.button("Excluir Registro Financeiro", use_container_width=True, type="primary"):
                     id_para_deletar = opcoes_fin[selecao_fin_str]
                     try:
@@ -1009,7 +1029,7 @@ with tab_financeiro:
         empty_state("💰", "Nenhum registro financeiro", "Lance vendas ou despesas para começar")
 
 # ==========================================
-# 7. GESTÃO DE CLIENTES
+# 6. GESTÃO DE CLIENTES
 # ==========================================
 with tab_clientes:
     secao("👥 Gestão de Clientes", "Cadastro completo com dados de contato e endereço")
@@ -1026,7 +1046,6 @@ with tab_clientes:
                 email_cli = st.text_input("E-mail")
                 end_cli = st.text_input("Endereço Completo")
                 obs_cli = st.text_area("Observações / Histórico")
-                
             if st.form_submit_button("Salvar Cliente", use_container_width=True) and nome_cli:
                 try:
                     supabase.table("clientes").insert({
@@ -1074,13 +1093,12 @@ with tab_clientes:
             empty_state("👥", "Nenhum cliente cadastrado", "Comece cadastrando seu primeiro cliente")
 
 # ==========================================
-# 8. DASHBOARD GERAL
+# 7. DASHBOARD GERAL
 # ==========================================
 with tab_dashboard:
     secao("📈 Painel Gerencial", "Visão consolidada do negócio em tempo real")
     st.caption(f"Atualizado em {datetime.now().strftime('%d/%m/%Y às %H:%M')}")
     
-    # ---- KPIs principais ----
     ent = df_financeiro[df_financeiro['Tipo'] == 'Entrada']['Valor'].sum() if not df_financeiro.empty and 'Tipo' in df_financeiro.columns else 0
     sai = df_financeiro[df_financeiro['Tipo'] == 'Saída']['Valor'].sum() if not df_financeiro.empty and 'Tipo' in df_financeiro.columns else 0
     lucro_vendas = df_vendas['Lucro'].sum() if not df_vendas.empty and 'Lucro' in df_vendas.columns else 0
@@ -1094,7 +1112,6 @@ with tab_dashboard:
     
     st.markdown("---")
     
-    # ---- Linha 1 de gráficos ----
     col_a, col_b = st.columns(2)
     with col_a:
         if not df_vendas.empty and 'Data' in df_vendas.columns:
@@ -1138,7 +1155,6 @@ with tab_dashboard:
             else:
                 st.info("Sem dados de produtos.")
     
-    # ---- Linha 2 de gráficos ----
     col_c, col_d = st.columns(2)
     with col_c:
         if not df_vendas.empty and 'Produto' in df_vendas.columns and 'Valor Total' in df_vendas.columns:
@@ -1185,7 +1201,7 @@ with tab_dashboard:
             st.info("Sem dados financeiros.")
 
 # ==========================================
-# 9. RELATÓRIO PDF INTEGRADO
+# 8. RELATÓRIO PDF INTEGRADO
 # ==========================================
 with tab_relatorio:
     secao("📄 Relatório Geral em PDF", "Documento completo extraído em tempo real do Supabase")
@@ -1193,7 +1209,6 @@ with tab_relatorio:
         "Gere um relatório completo com **todas as informações do sistema** "
         "(Estoque, Vendas, Financeiro e Clientes)."
     )
-
     st.info(
         "📊 **O relatório inclui:**\n"
         "- **Valor de Custo Total por produto** (Quantidade × Preço de Custo)\n"
@@ -1278,7 +1293,6 @@ with tab_relatorio:
         q = pd.to_numeric(df_estoque['Quantidade'], errors='coerce').fillna(0)
         pc = pd.to_numeric(df_estoque.get('Preço de Custo', 0), errors='coerce').fillna(0)
         pv = pd.to_numeric(df_estoque.get('Valor Unitário', 0), errors='coerce').fillna(0)
-
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("📦 Itens em Estoque", f"{int(q.sum())} un")
         c2.metric("💰 Capital Investido", moeda((q * pc).sum()))
