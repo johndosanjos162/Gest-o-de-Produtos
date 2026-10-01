@@ -356,10 +356,39 @@ with tab_financeiro:
         c1.metric("Entradas", f"R$ {total_ent:.2f}")
         c2.metric("Saídas", f"R$ {total_sai:.2f}")
         c3.metric("Saldo Líquido", f"R$ {total_ent - total_sai:.2f}")
+        
+        st.markdown("---")
         st.dataframe(df_financeiro[['id', 'Data', 'Tipo', 'Categoria', 'Descrição', 'Valor']].style.format({'Valor': 'R$ {:.2f}'}), hide_index=True)
+        
+        st.markdown("---")
+        st.subheader("🗑️ Gerenciar / Excluir Registros Financeiros")
+        
+        try:
+            res_fin = supabase.table("financeiro").select("id, data, descricao, valor, tipo").order("id", desc=True).execute()
+            dados_financeiros = res_fin.data
+            
+            if dados_financeiros:
+                opcoes_fin = {
+                    f"ID: {item['id']} | Data: {item['data']} | Desc: {item['descricao']} | R$ {item['valor']} ({item['tipo']})": item['id']
+                    for item in dados_financeiros
+                }
+                
+                selecao_fin_str = st.selectbox("Selecione o registro financeiro para excluir:", list(opcoes_fin.keys()), key="select_del_financeiro")
+                
+                if st.button("Excluir Registro Financeiro Selecionado", type="primary"):
+                    id_para_deletar = opcoes_fin[selecao_fin_str]
+                    try:
+                        supabase.table("financeiro").delete().eq("id", id_para_deletar).execute()
+                        st.success(f"Registro financeiro ID {id_para_deletar} excluído com sucesso!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao excluir o registro financeiro: {e}")
+            else:
+                st.info("Nenhum registro financeiro disponível para exclusão.")
+        except Exception as e:
+            st.warning(f"Não foi possível carregar os registros para exclusão: {e}")
     else:
         st.info("Nenhum registro financeiro.")
-
 # ==========================================
 # 5. GESTÃO DE CLIENTES
 # ==========================================
