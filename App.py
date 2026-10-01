@@ -95,7 +95,6 @@ def carregar_dados_tabela(nome_tabela):
     try:
         resposta = supabase.table(nome_tabela).select("*").execute()
         df = pd.DataFrame(resposta.data)
-        # Garante que colunas 'id' sejam inteiras se existirem
         if not df.empty and 'id' in df.columns:
             df['id'] = pd.to_numeric(df['id'], errors='coerce').fillna(0).astype(int)
         return df
@@ -112,7 +111,7 @@ df_clientes = carregar_dados_tabela("clientes")
 df_caixa = carregar_dados_tabela("fechamento_caixa")
 
 # ==========================================
-# NORMALIZAÇÃO ROBUSTA DE COLUNAS
+# NORMALIZAÇÃO DE COLUNAS
 # ==========================================
 if df_estoque.empty:
     df_estoque = pd.DataFrame(columns=['id', 'Produto', 'Categoria', 'Quantidade', 'Limite Mínimo', 'Valor Unitário', 'Preço de Custo'])
@@ -163,17 +162,12 @@ if df_clientes.empty:
 if df_caixa.empty:
     df_caixa = pd.DataFrame(columns=['id', 'data', 'tipo_registro', 'valor', 'responsavel', 'observacao'])
 
-# Garante colunas de apoio caso faltem
-if 'Preço de Custo' not in df_estoque.columns:
-    df_estoque['Preço de Custo'] = 0.00
-if 'Limite Mínimo' not in df_estoque.columns:
-    df_estoque['Limite Mínimo'] = 0
-if 'Valor Unitário' not in df_estoque.columns:
-    df_estoque['Valor Unitário'] = 0.00
-if 'Categoria' not in df_estoque.columns:
-    df_estoque['Categoria'] = 'Geral'
-if 'Quantidade' not in df_estoque.columns:
-    df_estoque['Quantidade'] = 0
+# Garante colunas de apoio
+if 'Preço de Custo' not in df_estoque.columns: df_estoque['Preço de Custo'] = 0.00
+if 'Limite Mínimo' not in df_estoque.columns: df_estoque['Limite Mínimo'] = 0
+if 'Valor Unitário' not in df_estoque.columns: df_estoque['Valor Unitário'] = 0.00
+if 'Categoria' not in df_estoque.columns: df_estoque['Categoria'] = 'Geral'
+if 'Quantidade' not in df_estoque.columns: df_estoque['Quantidade'] = 0
 
 # ==========================================
 # ABAS PRINCIPAIS DO ERP
@@ -192,10 +186,21 @@ tab_estoque, tab_vendas, tab_despesas, tab_financeiro, tab_clientes, tab_fornece
 ])
 
 # ==========================================
-# 1. ESTOQUE
+# 1. ESTOQUE (Com Total Investido a Preço de Custo)
 # ==========================================
 with tab_estoque:
-    st.subheader("📦 Gestão de Estoque")
+    st.subheader("📦 Gestão de Estoque & Capital Investido")
+    
+    if not df_estoque.empty and 'Quantidade' in df_estoque.columns and 'Preço de Custo' in df_estoque.columns:
+        total_investido_custo = (df_estoque['Quantidade'] * df_estoque['Preço de Custo']).sum()
+        total_valor_venda = (df_estoque['Quantidade'] * df_estoque['Valor Unitário']).sum()
+        
+        c_m1, c_m2, c_m3 = st.columns(3)
+        c_m1.metric("💰 Capital Total Investido (Custo)", f"R$ {total_investido_custo:.2f}")
+        c_m2.metric("🏷 Valor Potencial de Venda", f"R$ {total_valor_venda:.2f}")
+        c_m3.metric("📈 Lucro Potencial Estimado", f"R$ {total_valor_venda - total_investido_custo:.2f}")
+        st.markdown("---")
+        
     sub_est_cad, sub_est_ger = st.tabs(["➕ Cadastrar Produto", "✏️ Gerenciar, Editar e Excluir"])
     
     with sub_est_cad:
@@ -204,7 +209,7 @@ with tab_estoque:
             with col1:
                 nome = st.text_input("Nome do Produto")
                 categoria = st.selectbox("Categoria", ["Grãos", "Massas", "Óleos e Condimentos", "Bebidas", "Outros"])
-                preco_custo = st.number_input("Preço de Custo (R$)", min_value=0.0, step=0.01)
+                preco_custo = st.number_input("Preço de Custo (Preço de Mercado Pago) (R$)", min_value=0.0, step=0.01)
                 preco = st.number_input("Valor Unitário / Venda (R$)", min_value=0.0, step=0.01)
             with col2:
                 qtd = st.number_input("Quantidade Inicial", min_value=0, step=1)
@@ -259,10 +264,19 @@ with tab_estoque:
             st.info("Nenhum produto no estoque.")
 
 # ==========================================
-# 2. VENDAS
+# 2. VENDAS (Com Apuração Clara de Lucro Real)
 # ==========================================
 with tab_vendas:
-    st.subheader("🛒 Registro e Gestão de Vendas")
+    st.subheader("🛒 Registro de Vendas e Apuração de Lucro")
+    
+    if not df_vendas.empty and 'Lucro' in df_vendas.columns and 'Valor Total' in df_vendas.columns:
+        total_faturamento = df_vendas['Valor Total'].sum()
+        total_lucro_apurado = df_vendas['Lucro'].sum()
+        c_v1, c_v2 = st.columns(2)
+        c_v1.metric("💵 Faturamento Total de Vendas", f"R$ {total_faturamento:.2f}")
+        c_v2.metric("📈 Lucro Real Líquido Apurado", f"R$ {total_lucro_apurado:.2f}", help="Calculado subtraindo o preço de custo de cada mercadoria comercializada.")
+        st.markdown("---")
+
     sub_v_reg, sub_v_ger = st.tabs(["➕ Registrar Venda", "📋 Histórico e Exclusão"])
     
     with sub_v_reg:
@@ -271,31 +285,35 @@ with tab_vendas:
                 prod_venda = st.selectbox("Produto Vendido", df_estoque['Produto'].tolist())
                 qtd_venda = st.number_input("Quantidade", min_value=1, step=1)
                 
-                if st.form_submit_button("Registrar Venda"):
-                    item_est = df_estoque[df_estoque['Produto'] == prod_venda].iloc[0]
-                    estoque_atual = int(item_est['Quantidade'])
-                    
-                    if qtd_venda <= estoque_atual:
-                        vlr_total = qtd_venda * float(item_est['Valor Unitário'])
-                        lucro_venda = (float(item_est['Valor Unitário']) - float(item_est['Preço de Custo'])) * qtd_venda
+                # Exibe prévia imediata baseada no custo atual do produto
+                item_est_preview = df_estoque[df_estoque['Produto'] == prod_venda].iloc[0]
+                p_unit = float(item_est_preview['Valor Unitário'])
+                c_unit = float(item_est_preview['Preço de Custo'])
+                est_atual = int(item_est_preview['Quantidade'])
+                
+                st.info(f"💡 **Prévia:** Preço de Venda Unit.: R$ {p_unit:.2f} | Custo Unit.: R$ {c_unit:.2f} | Lucro Unit.: R$ {p_unit - c_unit:.2f}")
+                
+                if st.form_submit_button("Confirmar e Registrar Venda"):
+                    if qtd_venda <= est_atual:
+                        vlr_total = qtd_venda * p_unit
+                        lucro_venda = (p_unit - c_unit) * qtd_venda
                         data_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         
-                        supabase.table("estoque").update({"quantidade": estoque_atual - qtd_venda}).eq("id", item_est['id']).execute()
+                        supabase.table("estoque").update({"quantidade": est_atual - qtd_venda}).eq("id", int(item_est_preview['id'])).execute()
                         supabase.table("vendas").insert({"data": data_str, "produto": prod_venda, "quantidade": int(qtd_venda), "valor_total": float(vlr_total), "lucro": float(lucro_venda)}).execute()
                         supabase.table("financeiro").insert({"data": data_str, "descricao": f"Venda: {prod_venda} ({qtd_venda} un)", "tipo": "Entrada", "categoria": "Vendas de Produtos", "valor": float(vlr_total)}).execute()
                         
-                        st.success("✅ Venda registrada com baixa automática!")
+                        st.success(f"✅ Venda registrada! Lucro obtido nesta operação: R$ {lucro_venda:.2f}")
                         st.rerun()
                     else:
-                        st.error("Estoque insuficiente!")
+                        st.error("Estoque insuficiente para essa quantidade!")
             else:
-                st.warning("Cadastre produtos primeiro.")
+                st.warning("Cadastre produtos no estoque primeiro.")
 
     with sub_v_ger:
         if not df_vendas.empty and 'Valor Total' in df_vendas.columns:
             st.dataframe(df_vendas[['id', 'Data', 'Produto', 'Quantidade', 'Valor Total', 'Lucro']].style.format({'Valor Total': 'R$ {:.2f}', 'Lucro': 'R$ {:.2f}'}), hide_index=True)
             st.markdown("---")
-            # Usando formatador string para evitar que o selectbox formate o ID com pontos (ex: 1.000)
             lista_ids_vendas = [str(x) for x in df_vendas['id'].tolist()]
             v_id_del_str = st.selectbox("Selecione o ID da venda para excluir:", lista_ids_vendas, key="del_venda")
             if st.button("Excluir Venda Selecionada"):
@@ -345,7 +363,7 @@ with tab_despesas:
             st.info("Nenhuma despesa lançada.")
 
 # ==========================================
-# 4. FINANCEIRO
+# 4. FINANCEIRO (Com Opção de Exclusão)
 # ==========================================
 with tab_financeiro:
     st.subheader("💰 Fluxo de Caixa Completo")
@@ -389,6 +407,7 @@ with tab_financeiro:
             st.warning(f"Não foi possível carregar os registros para exclusão: {e}")
     else:
         st.info("Nenhum registro financeiro.")
+
 # ==========================================
 # 5. GESTÃO DE CLIENTES
 # ==========================================
@@ -486,7 +505,7 @@ with tab_fornecedores:
                     p_sel = st.selectbox("Produto", df_estoque['Produto'].tolist()) if not df_estoque.empty and 'Produto' in df_estoque.columns else st.text_input("Produto")
                     qtd_comp = st.number_input("Quantidade", min_value=1, step=1)
                 with c2:
-                    custo_u = st.number_input("Custo Unitário (R$)", min_value=0.01, step=0.01)
+                    custo_u = st.number_input("Custo Unitário de Compra (R$)", min_value=0.01, step=0.01)
                     st_ped = st.selectbox("Status", ["Pendente", "Entregue"])
                 
                 up_est_auto = st.checkbox("Atualizar Estoque Automaticamente?", value=True)
@@ -552,25 +571,21 @@ with tab_fornecedores:
             st.info("Nenhum pedido de compra registrado.")
 
 # ==========================================
-# 7. EMISSÃO DE ETIQUETAS DE CÓDIGO DE BARRAS
+# 7. ETIQUETAS
 # ==========================================
 with tab_etiquetas:
     st.subheader("🏷️ Emissão de Etiquetas e Código de Barras")
-    st.write("Selecione um produto do estoque para gerar etiquetas de gôndola formatadas para impressão rápida.")
-    
     if not df_estoque.empty and 'Produto' in df_estoque.columns:
         col_e1, col_e2 = st.columns(2)
         with col_e1:
             prod_etq = st.selectbox("Selecione o Produto", df_estoque['Produto'].tolist())
-            qtd_etiquetas = st.number_input("Quantidade de Etiquetas a Gerar", min_value=1, max_value=100, value=10)
+            qtd_etiquetas = st.number_input("Quantidade de Etiquetas", min_value=1, max_value=100, value=10)
         
         item_etq = df_estoque[df_estoque['Produto'] == prod_etq].iloc[0]
         preco_etq = item_etq['Valor Unitário']
         cod_id = str(item_etq['id']).zfill(6)
         
         st.markdown("---")
-        st.write("### 🖨 Pré-visualização da Etiqueta")
-        
         cols_preview = st.columns(3)
         for i in range(min(3, qtd_etiquetas)):
             with cols_preview[i]:
@@ -582,20 +597,14 @@ with tab_etiquetas:
                     <p style="font-size: 20px; font-family: monospace; letter-spacing: 2px; margin: 5px 0;">||| | |||| || |</p>
                 </div>
                 """, unsafe_allow_html=True)
-                
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🖨️ Imprimir / Gerar Lote de Etiquetas"):
-            st.info(f"Geradas {qtd_etiquetas} etiquetas para o produto **{prod_etq}**. Pressione Ctrl+P no seu navegador para imprimir.")
     else:
-        st.info("Nenhum produto cadastrado no estoque para gerar etiquetas.")
+        st.info("Cadastre produtos primeiro.")
 
 # ==========================================
-# 8. INTELIGÊNCIA DE VENDAS & CURVA ABC
+# 8. CURVA ABC
 # ==========================================
 with tab_curva_abc:
     st.subheader("📊 Inteligência de Vendas & Relatório Curva ABC")
-    st.write("Análise automatizada do faturamento por produto para classificar seu mix no padrão Curva ABC.")
-    
     if not df_vendas.empty and 'Produto' in df_vendas.columns and 'Valor Total' in df_vendas.columns:
         curva_df = df_vendas.groupby('Produto').agg(
             Quantidade_Vendida=('Quantidade', 'sum'),
@@ -609,48 +618,23 @@ with tab_curva_abc:
             curva_df['Acumulado_%'] = curva_df['Participacao_%'].cumsum()
             
             def classificar_abc(acum):
-                if acum <= 80:
-                    return 'A (Até 80%)'
-                elif acum <= 95:
-                    return 'B (80% - 95%)'
-                else:
-                    return 'C (95% - 100%)'
+                if acum <= 80: return 'A (Até 80%)'
+                elif acum <= 95: return 'B (80% - 95%)'
+                else: return 'C (95% - 100%)'
                     
             curva_df['Curva ABC'] = curva_df['Acumulado_%'].apply(classificar_abc)
-            
-            c1, c2, c3 = st.columns(3)
-            c1.metric("📦 Produtos Comercializados", len(curva_df))
-            c2.metric("💎 Faturamento Analisado", f"R$ {faturamento_geral:.2f}")
-            c3.metric("🏆 Produtos Classe A", len(curva_df[curva_df['Curva ABC'].str.startswith('A')]))
-            
-            st.markdown("---")
-            st.dataframe(curva_df[['Curva ABC', 'Produto', 'Quantidade_Vendida', 'Faturamento_Total', 'Lucro_Total', 'Participacao_%']].style.format({
-                'Faturamento_Total': 'R$ {:.2f}', 
-                'Lucro_Total': 'R$ {:.2f}', 
-                'Participacao_%': '{:.2f}%'
-            }), hide_index=True)
-            
-            st.markdown("---")
-            st.altair_chart(
-                alt.Chart(curva_df).mark_bar(color='#4f46e5').encode(
-                    x=alt.X('Produto:N', sort='-y'),
-                    y=alt.Y('Faturamento_Total:Q', title='Faturamento (R$)'),
-                    color='Curva ABC:N',
-                    tooltip=['Produto', 'Faturamento_Total', 'Curva ABC']
-                ).properties(height=350),
-                use_container_width=True
-            )
+            st.dataframe(curva_df.style.format({'Faturamento_Total': 'R$ {:.2f}', 'Lucro_Total': 'R$ {:.2f}', 'Participacao_%': '{:.2f}%'}), hide_index=True)
         else:
-            st.info("Faturamento total zerado.")
+            st.info("Faturamento zerado.")
     else:
-        st.info("Registre vendas no sistema para gerar a Inteligência de Vendas e Curva ABC.")
+        st.info("Registre vendas para ver a Curva ABC.")
 
 # ==========================================
-# 9. FECHAMENTO DE CAIXA, SANGRIA E QUEBRA
+# 9. CAIXA & SANGRIA
 # ==========================================
 with tab_caixa:
     st.subheader("💵 Fechamento de Caixa Diário, Sangria e Quebra")
-    sub_cx_lanc, sub_cx_ger = st.tabs(["➕ Operações de Caixa", "📋 Histórico e Exclusão de Caixa"])
+    sub_cx_lanc, sub_cx_ger = st.tabs(["➕ Operações de Caixa", "📋 Histórico e Exclusão"])
     
     with sub_cx_lanc:
         with st.form("form_operacao_caixa"):
@@ -662,64 +646,39 @@ with tab_caixa:
                 vlr_op = st.number_input("Valor Envolvido (R$)", min_value=0.0, step=0.01)
                 data_op = st.date_input("Data da Operação", value=datetime.now())
                 
-            obs_op = st.text_area("Observações (Ex: Motivo da sangria, conferência ou quebra)")
-            
+            obs_op = st.text_area("Observações")
             if st.form_submit_button("Registrar Operação de Caixa"):
                 dt_str = f"{data_op} {datetime.now().strftime('%H:%M:%S')}"
                 db_tipo = "Abertura" if "Abertura" in tipo_op else ("Sangria" if "Sangria" in tipo_op else "Fechamento")
-                
-                try:
-                    supabase.table("fechamento_caixa").insert({
-                        "data": dt_str, "tipo_registro": db_tipo, "valor": float(vlr_op),
-                        "responsavel": resp, "observacao": obs_op
-                    }).execute()
-                    
-                    if db_tipo == "Sangria":
-                        supabase.table("financeiro").insert({
-                            "data": dt_str, "descricao": f"Sangria de Caixa ({resp}): {obs_op}",
-                            "tipo": "Saída", "categoria": "Despesas Operacionais", "valor": float(vlr_op)
-                        }).execute()
-                        
-                    st.success(f"✅ Operação de '{db_tipo}' registrada com sucesso!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro: {e}")
+                supabase.table("fechamento_caixa").insert({"data": dt_str, "tipo_registro": db_tipo, "valor": float(vlr_op), "responsavel": resp, "observacao": obs_op}).execute()
+                if db_tipo == "Sangria":
+                    supabase.table("financeiro").insert({"data": dt_str, "descricao": f"Sangria ({resp}): {obs_op}", "tipo": "Saída", "categoria": "Despesas Operacionais", "valor": float(vlr_op)}).execute()
+                st.success("Operação registrada!")
+                st.rerun()
 
     with sub_cx_ger:
         if not df_caixa.empty:
             st.dataframe(df_caixa.style.format({'valor': 'R$ {:.2f}'}), hide_index=True)
-            st.markdown("---")
             lista_ids_cx = [str(x) for x in df_caixa['id'].tolist()]
-            cx_del_str = st.selectbox("Selecione o ID do registro de caixa para excluir:", lista_ids_cx, key="del_cx_reg")
+            cx_del_str = st.selectbox("ID do registro de caixa para excluir:", lista_ids_cx, key="del_cx_reg")
             if st.button("Excluir Registro de Caixa"):
                 supabase.table("fechamento_caixa").delete().eq("id", int(cx_del_str)).execute()
-                st.success("Registro de caixa excluído!")
+                st.success("Excluído com sucesso!")
                 st.rerun()
         else:
-            st.info("Nenhuma operação de caixa registrada.")
+            st.info("Nenhuma operação registrada.")
 
 # ==========================================
 # 10. DASHBOARD GERAL
 # ==========================================
 with tab_dashboard:
-    st.subheader("📊 Dashboard Geral do Sistema")
-    dados_fin_dash = df_financeiro.copy()
-    if not dados_fin_dash.empty and 'Tipo' in dados_fin_dash.columns:
-        ent = dados_fin_dash[dados_fin_dash['Tipo'] == 'Entrada']['Valor'].sum()
-        sai = dados_fin_dash[dados_fin_dash['Tipo'] == 'Saída']['Valor'].sum()
-        
+    st.subheader("📈 Dashboard Geral do Sistema")
+    if not df_financeiro.empty and 'Tipo' in df_financeiro.columns:
+        ent = df_financeiro[df_financeiro['Tipo'] == 'Entrada']['Valor'].sum()
+        sai = df_financeiro[df_financeiro['Tipo'] == 'Saída']['Valor'].sum()
         c1, c2, c3 = st.columns(3)
         c1.metric("Entradas Totais", f"R$ {ent:.2f}")
         c2.metric("Saídas Totais", f"R$ {sai:.2f}")
         c3.metric("Saldo Líquido", f"R$ {ent - sai:.2f}")
-        
-        st.markdown("---")
-        st.altair_chart(
-            alt.Chart(dados_fin_dash.groupby('Tipo')['Valor'].sum().reset_index()).mark_arc(innerRadius=50).encode(
-                theta='Valor:Q', color=alt.Color('Tipo:N', scale=alt.Scale(domain=['Entrada', 'Saída'], range=['#22c55e', '#ef4444'])),
-                tooltip=['Tipo', 'Valor']
-            ).properties(height=300),
-            use_container_width=True
-        )
     else:
         st.info("Sem dados para o dashboard.")
