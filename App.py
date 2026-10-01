@@ -170,10 +170,11 @@ if 'Categoria' not in df_estoque.columns: df_estoque['Categoria'] = 'Geral'
 if 'Quantidade' not in df_estoque.columns: df_estoque['Quantidade'] = 0
 
 # ==========================================
-# ABAS PRINCIPAIS DO ERP
+# ABAS PRINCIPAIS DO ERP (Com a nova aba de fichas por produto)
 # ==========================================
-tab_estoque, tab_vendas, tab_despesas, tab_financeiro, tab_clientes, tab_fornecedores, tab_etiquetas, tab_curva_abc, tab_caixa, tab_dashboard = st.tabs([
+tab_estoque, tab_planilhas_prod, tab_vendas, tab_despesas, tab_financeiro, tab_clientes, tab_fornecedores, tab_etiquetas, tab_curva_abc, tab_caixa, tab_dashboard = st.tabs([
     "📦 Estoque", 
+    "📑 Fichas por Produto",
     "🛒 Vendas", 
     "💡 Despesas",
     "💰 Financeiro", 
@@ -186,7 +187,7 @@ tab_estoque, tab_vendas, tab_despesas, tab_financeiro, tab_clientes, tab_fornece
 ])
 
 # ==========================================
-# 1. ESTOQUE (Com Total Investido a Preço de Custo)
+# 1. ESTOQUE
 # ==========================================
 with tab_estoque:
     st.subheader("📦 Gestão de Estoque & Capital Investido")
@@ -209,10 +210,10 @@ with tab_estoque:
             with col1:
                 nome = st.text_input("Nome do Produto")
                 categoria = st.selectbox("Categoria", ["Grãos", "Massas", "Óleos e Condimentos", "Bebidas", "Outros"])
-                preco_custo = st.number_input("Preço de Custo (Preço de Mercado Pago) (R$)", min_value=0.0, step=0.01)
-                preco = st.number_input("Valor Unitário / Venda (R$)", min_value=0.0, step=0.01)
+                preco_custo = st.number_input("Preço de Mercado / Custo Unitário (R$)", min_value=0.0, step=0.01)
+                preco = st.number_input("Valor de Venda / Revenda Unitário (R$)", min_value=0.0, step=0.01)
             with col2:
-                qtd = st.number_input("Quantidade Inicial", min_value=0, step=1)
+                qtd = st.number_input("Quantidade Inicial em Estoque", min_value=0, step=1)
                 limite = st.number_input("Limite Mínimo de Alerta", min_value=0, step=1)
             
             if st.form_submit_button("Cadastrar Produto") and nome:
@@ -221,7 +222,7 @@ with tab_estoque:
                         "produto": nome.strip(), "categoria": categoria, "quantidade": int(qtd),
                         "limite_minimo": int(limite), "valor_unitario": float(preco), "preco_custo": float(preco_custo)
                     }).execute()
-                    st.success("✅ Produto cadastrado!")
+                    st.success("✅ Produto cadastrado com sucesso!")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erro: {e}")
@@ -236,8 +237,8 @@ with tab_estoque:
                 e_cat = st.text_input("Categoria", value=str(item_e['Categoria']))
                 e_qtd = st.number_input("Quantidade", value=int(item_e['Quantidade']), min_value=0, step=1)
                 e_lim = st.number_input("Limite Mínimo", value=int(item_e['Limite Mínimo']), min_value=0, step=1)
-                e_custo = st.number_input("Preço de Custo (R$)", value=float(item_e['Preço de Custo']), min_value=0.0, step=0.01)
-                e_venda = st.number_input("Valor Unitário (R$)", value=float(item_e['Valor Unitário']), min_value=0.0, step=0.01)
+                e_custo = st.number_input("Preço de Mercado / Custo (R$)", value=float(item_e['Preço de Custo']), min_value=0.0, step=0.01)
+                e_venda = st.number_input("Valor de Venda / Revenda (R$)", value=float(item_e['Valor Unitário']), min_value=0.0, step=0.01)
                 
                 col_b1, col_b2 = st.columns(2)
                 salvar_ed = col_b1.form_submit_button("💾 Salvar Alterações do Produto")
@@ -259,12 +260,92 @@ with tab_estoque:
             st.markdown("---")
             dados_est = df_estoque.copy()
             dados_est['Valor Custo Total'] = dados_est['Quantidade'] * dados_est['Preço de Custo']
-            st.dataframe(dados_est[['Produto', 'Categoria', 'Quantidade', 'Preço de Custo', 'Valor Unitário', 'Valor Custo Total']].style.format({'Preço de Custo': 'R$ {:.2f}', 'Valor Unitário': 'R$ {:.2f}', 'Valor Custo Total': 'R$ {:.2f}'}), hide_index=True)
+            dados_est['Valor Venda Total'] = dados_est['Quantidade'] * dados_est['Valor Unitário']
+            st.dataframe(dados_est[['Produto', 'Categoria', 'Quantidade', 'Preço de Custo', 'Valor Unitário', 'Valor Custo Total', 'Valor Venda Total']].style.format({'Preço de Custo': 'R$ {:.2f}', 'Valor Unitário': 'R$ {:.2f}', 'Valor Custo Total': 'R$ {:.2f}', 'Valor Venda Total': 'R$ {:.2f}'}), hide_index=True)
         else:
             st.info("Nenhum produto no estoque.")
 
 # ==========================================
-# 2. VENDAS (Com Apuração Clara de Lucro Real)
+# 2. PLANILHAS ESPECÍFICAS POR PRODUTO
+# ==========================================
+with tab_planilhas_prod:
+    st.subheader("📑 Ficha e Simulação Individual por Produto")
+    st.write("Visualize de forma isolada as especificações de mercado, preço de revenda e o faturamento total projetado para cada item.")
+    
+    if not df_estoque.empty and 'Produto' in df_estoque.columns:
+        produto_escolhido = st.selectbox("Escolha o produto para ver a ficha detalhada:", df_estoque['Produto'].tolist(), key="sel_ficha_prod")
+        
+        # Filtra os dados do produto selecionado
+        p_info = df_estoque[df_estoque['Produto'] == produto_escolhido].iloc[0]
+        
+        qtd_atual = int(p_info['Quantidade'])
+        preco_mercado = float(p_info['Preço de Custo'])
+        preco_revenda_atual = float(p_info['Valor Unitário'])
+        
+        st.markdown("---")
+        st.markdown(f"### 📋 Ficha Técnica: **{produto_escolhido}** ({p_info['Categoria']})")
+        
+        # Bloco de edição rápida do preço de venda específico para este produto
+        with st.form(f"form_ficha_{p_info['id']}"):
+            col_f1, col_f2, col_f3 = st.columns(3)
+            with col_f1:
+                st.metric("📦 Estoque Atual", f"{qtd_atual} un")
+            with col_f2:
+                novo_preco_revenda = st.number_input("Valor de Venda / Revenda (R$)", value=preco_revenda_atual, min_value=0.0, step=0.01)
+            with col_f3:
+                st.metric("🏷️ Valor de Mercado (Custo)", f"R$ {preco_mercado:.2f}")
+                
+            atualizar_preco_isolado = st.form_submit_button("Atualizar Valor de Revenda deste Produto")
+            if atualizar_preco_isolado:
+                supabase.table("estoque").update({"valor_unitario": float(novo_preco_revenda)}).eq("id", int(p_info['id'])).execute()
+                st.success(f"Preço de revenda de '{produto_escolhido}' atualizado com sucesso!")
+                st.rerun()
+                
+        # Cálculos de projeção para o produto selecionado
+        custo_total_prod = qtd_atual * preco_mercado
+        faturamento_total_prod = qtd_atual * novo_preco_revenda if 'novo_preco_revenda' in locals() else qtd_atual * preco_revenda_atual
+        lucro_total_prod = faturamento_total_prod - custo_total_prod
+        margem_lucro_pct = ((novo_preco_revenda - preco_mercado) / preco_mercado * 100) if preco_mercado > 0 else 0.0
+        
+        st.markdown("#### 💰 Resumo Financeiro Projetado (Com o Estoque Atual)")
+        cp1, cp2, cp3, cp4 = st.columns(4)
+        cp1.metric("Total Investido (Custo Mercado)", f"R$ {custo_total_prod:.2f}")
+        cp2.metric("Total da Venda (Revenda)", f"R$ {faturamento_total_prod:.2f}")
+        cp3.metric("Lucro Total Estimado", f"R$ {lucro_total_prod:.2f}")
+        cp4.metric("Margem Unitária", f"{margem_lucro_pct:.1f}%")
+        
+        st.markdown("---")
+        st.markdown("#### 📊 Tabela de Simulação de Venda em Lote")
+        
+        # Cria uma mini-tabela simuladora de lotes (ex: 1 un até 50 un)
+        simulacao_dados = []
+        for q in [1, 5, 10, 20, 50, 100, qtd_atual if qtd_atual > 0 else 1]:
+            if q <= qtd_atual or q == [1, 5, 10, 20, 50, 100, qtd_atual if qtd_atual > 0 else 1][-1]:
+                fat_q = q * novo_preco_revenda
+                custo_q = q * preco_mercado
+                lucro_q = fat_q - custo_q
+                simulacao_dados.append({
+                    "Quantidade": q,
+                    "Preço de Mercado (Unit.)": preco_mercado,
+                    "Preço de Revenda (Unit.)": novo_preco_revenda,
+                    "Faturamento Total": fat_q,
+                    "Custo Total": custo_q,
+                    "Lucro Líquido": lucro_q
+                })
+        df_simulacao = pd.DataFrame(simulacao_dados).drop_duplicates(subset=['Quantidade'])
+        st.dataframe(df_simulacao.style.format({
+            'Preço de Mercado (Unit.)': 'R$ {:.2f}',
+            'Preço de Revenda (Unit.)': 'R$ {:.2f}',
+            'Faturamento Total': 'R$ {:.2f}',
+            'Custo Total': 'R$ {:.2f}',
+            'Lucro Líquido': 'R$ {:.2f}'
+        }), hide_index=True)
+        
+    else:
+        st.info("Cadastre produtos no estoque para visualizar as planilhas individuais.")
+
+# ==========================================
+# 3. VENDAS
 # ==========================================
 with tab_vendas:
     st.subheader("🛒 Registro de Vendas e Apuração de Lucro")
@@ -274,7 +355,7 @@ with tab_vendas:
         total_lucro_apurado = df_vendas['Lucro'].sum()
         c_v1, c_v2 = st.columns(2)
         c_v1.metric("💵 Faturamento Total de Vendas", f"R$ {total_faturamento:.2f}")
-        c_v2.metric("📈 Lucro Real Líquido Apurado", f"R$ {total_lucro_apurado:.2f}", help="Calculado subtraindo o preço de custo de cada mercadoria comercializada.")
+        c_v2.metric("📈 Lucro Real Líquido Apurado", f"R$ {total_lucro_apurado:.2f}")
         st.markdown("---")
 
     sub_v_reg, sub_v_ger = st.tabs(["➕ Registrar Venda", "📋 Histórico e Exclusão"])
@@ -285,13 +366,12 @@ with tab_vendas:
                 prod_venda = st.selectbox("Produto Vendido", df_estoque['Produto'].tolist())
                 qtd_venda = st.number_input("Quantidade", min_value=1, step=1)
                 
-                # Exibe prévia imediata baseada no custo atual do produto
                 item_est_preview = df_estoque[df_estoque['Produto'] == prod_venda].iloc[0]
                 p_unit = float(item_est_preview['Valor Unitário'])
                 c_unit = float(item_est_preview['Preço de Custo'])
                 est_atual = int(item_est_preview['Quantidade'])
                 
-                st.info(f"💡 **Prévia:** Preço de Venda Unit.: R$ {p_unit:.2f} | Custo Unit.: R$ {c_unit:.2f} | Lucro Unit.: R$ {p_unit - c_unit:.2f}")
+                st.info(f"💡 **Prévia:** Preço de Revenda Unit.: R$ {p_unit:.2f} | Preço de Mercado Unit.: R$ {c_unit:.2f} | Lucro Unit.: R$ {p_unit - c_unit:.2f}")
                 
                 if st.form_submit_button("Confirmar e Registrar Venda"):
                     if qtd_venda <= est_atual:
@@ -324,7 +404,7 @@ with tab_vendas:
             st.info("Nenhuma venda registrada.")
 
 # ==========================================
-# 3. DESPESAS
+# 4. DESPESAS
 # ==========================================
 with tab_despesas:
     st.subheader("💡 Despesas do Comércio")
@@ -363,7 +443,7 @@ with tab_despesas:
             st.info("Nenhuma despesa lançada.")
 
 # ==========================================
-# 4. FINANCEIRO (Com Opção de Exclusão)
+# 5. FINANCEIRO
 # ==========================================
 with tab_financeiro:
     st.subheader("💰 Fluxo de Caixa Completo")
@@ -409,7 +489,7 @@ with tab_financeiro:
         st.info("Nenhum registro financeiro.")
 
 # ==========================================
-# 5. GESTÃO DE CLIENTES
+# 6. GESTÃO DE CLIENTES
 # ==========================================
 with tab_clientes:
     st.subheader("👥 Gestão de Clientes")
@@ -474,7 +554,7 @@ with tab_clientes:
             st.info("Nenhum cliente cadastrado.")
 
 # ==========================================
-# 6. FORNECEDORES E COMPRAS
+# 7. FORNECEDORES E COMPRAS
 # ==========================================
 with tab_fornecedores:
     st.subheader("🤝 Fornecedores e Pedidos de Compra")
@@ -571,7 +651,7 @@ with tab_fornecedores:
             st.info("Nenhum pedido de compra registrado.")
 
 # ==========================================
-# 7. ETIQUETAS
+# 8. ETIQUETAS
 # ==========================================
 with tab_etiquetas:
     st.subheader("🏷️ Emissão de Etiquetas e Código de Barras")
@@ -601,7 +681,7 @@ with tab_etiquetas:
         st.info("Cadastre produtos primeiro.")
 
 # ==========================================
-# 8. CURVA ABC
+# 9. CURVA ABC
 # ==========================================
 with tab_curva_abc:
     st.subheader("📊 Inteligência de Vendas & Relatório Curva ABC")
@@ -630,7 +710,7 @@ with tab_curva_abc:
         st.info("Registre vendas para ver a Curva ABC.")
 
 # ==========================================
-# 9. CAIXA & SANGRIA
+# 10. CAIXA & SANGRIA
 # ==========================================
 with tab_caixa:
     st.subheader("💵 Fechamento de Caixa Diário, Sangria e Quebra")
@@ -669,13 +749,13 @@ with tab_caixa:
             st.info("Nenhuma operação registrada.")
 
 # ==========================================
-# 10. DASHBOARD GERAL
+# 11. DASHBOARD GERAL
 # ==========================================
 with tab_dashboard:
     st.subheader("📈 Dashboard Geral do Sistema")
     if not df_financeiro.empty and 'Tipo' in df_financeiro.columns:
         ent = df_financeiro[df_financeiro['Tipo'] == 'Entrada']['Valor'].sum()
-        sai = df_financeiro[df_financeiro['Tipo'] == 'Saída']['Valor'].sum()
+        sai = df_financeiro[df_financeior['Tipo'] == 'Saída']['Valor'].sum() if 'df_financeiro' in locals() else 0
         c1, c2, c3 = st.columns(3)
         c1.metric("Entradas Totais", f"R$ {ent:.2f}")
         c2.metric("Saídas Totais", f"R$ {sai:.2f}")
