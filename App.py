@@ -74,7 +74,7 @@ def tela_login():
             botao_login = st.form_submit_button("Entrar no Sistema", use_container_width=True)
             
             if botao_login:
-                if usuario == "admin" and senha == "admin123":
+                if usuario == "JOHN" and senha == "fgxv4VP0":
                     st.session_state.autenticado = True
                     st.success("Login realizado com sucesso!")
                     st.rerun()
